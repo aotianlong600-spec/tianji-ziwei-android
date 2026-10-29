@@ -1,0 +1,8 @@
+{
+  "compilerOptions": {
+    "strict": true, "noEmit": true, "skipLibCheck": true, "esModuleInterop": true,
+    "target": "ES2017", "module": "ESNext", "moduleResolution": "bundler", "lib": ["dom", "esnext"],
+    "baseUrl": ".", "typeRoots": ["../ziwei-doushu/node_modules/@types"], "paths": { "lunar-javascript": ["../ziwei-doushu/node_modules/lunar-javascript"] }
+  },
+  "include": ["web/*.ts", "../ziwei-doushu/lib/ziwei/lunar-javascript.d.ts"]
+}

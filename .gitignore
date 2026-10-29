@@ -1,0 +1,15 @@
+**/node_modules/
+**/build/
+*.apk
+*.aab
+*.idsig
+*.keystore
+*.jks
+.env
+.env.*
+local.properties
+*.log
+*.pdf
+*.docx
+*.zip
+.DS_Store
