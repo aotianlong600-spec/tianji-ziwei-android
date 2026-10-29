@@ -1,6 +1,7 @@
-import { Solar } from 'lunar-javascript';
+import { Solar, Lunar, LunarMonth } from 'lunar-javascript';
 import { annualGua, monthGuas, type Gua, type Minggua } from './minggua';
 
+export type DailyCalendar='solar'|'lunar';
 export interface DailyGuaResult extends Gua { changeLine:number; group:number }
 export interface DailyDateResult {
   dateTime:string; flowYear:number; age:number; month:number; term:string;
@@ -62,6 +63,31 @@ function queryTime(date:string,clock:string) {
   if(!timeParts)throw new Error('查询时间须为HH:mm或HH:mm:ss');
   const dateTime=`${date} ${timeParts[1]}:${timeParts[2]}:${timeParts[3]||'00'}`;
   return {year,dateTime,milliseconds:wallMilliseconds(dateTime)};
+}
+
+export function dailySolarDate(calendar:DailyCalendar,date:string,leap=false):string {
+  if(calendar!=='solar'&&calendar!=='lunar')throw new Error('查询历法须为公历或农历');
+  if(typeof leap!=='boolean')throw new Error('农历闰月标记须为是或否');
+  if(calendar==='solar') {queryTime(date,'00:00');return date;}
+  const parts=typeof date==='string'?/^(\d{4})-(\d{2})-(\d{2})$/.exec(date):null;
+  if(!parts)throw new Error('农历日期须为有效的YYYY-MM-DD格式');
+  const [year,month,day]=parts.slice(1).map(Number);
+  if(year<1899||year>2200||month<1||month>12||day<1||day>30)throw new Error('农历日期须为1899–2200年的有效年月日');
+  const lunarMonth=LunarMonth.fromYm(year,leap?-month:month);
+  if(!lunarMonth||day>lunarMonth.getDayCount())throw new Error('农历日期不存在，请核对年月日和闰月');
+  // 此处只转换真实日历，不使用紫微安星的“闰月作下月”口径。
+  const solar=Lunar.fromYmd(year,leap?-month:month,day).getSolar();
+  const result=`${solar.getYear()}-${String(solar.getMonth()).padStart(2,'0')}-${String(solar.getDay()).padStart(2,'0')}`;
+  queryTime(result,'00:00');
+  return result;
+}
+
+export function dailyCalendarDates(solarDate:string):{solar:string;lunar:string;leap:boolean;lunarLabel:string} {
+  queryTime(solarDate,'00:00');
+  const [year,month,day]=solarDate.split('-').map(Number);
+  const lunar=Solar.fromYmd(year,month,day).getLunar();
+  const lunarYear=lunar.getYear(), lunarMonth=Math.abs(lunar.getMonth()), lunarDay=lunar.getDay(), leap=lunar.getMonth()<0;
+  return {solar:solarDate,lunar:`${lunarYear}-${String(lunarMonth).padStart(2,'0')}-${String(lunarDay).padStart(2,'0')}`,leap,lunarLabel:`${lunarYear}年${leap?'闰':''}${lunarMonth}月${lunarDay}日`};
 }
 
 export function dailyFromDate(data:Minggua,date:string,clock:string):DailyDateResult {

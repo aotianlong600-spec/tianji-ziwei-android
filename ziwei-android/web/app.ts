@@ -1,7 +1,7 @@
 import { makeChart, toBirthInfo, actualLunarLabel, pillarContext, type BirthInput } from './model';
 import { fromPillars, textbookExample, annualGua, hexName, lineName } from './minggua';
 import { mingguaHTML, guaDiagram } from './minggua-view';
-import { dailyFromDate, solarMonthStart } from './daily-gua';
+import { dailyFromDate, solarMonthStart, dailySolarDate, dailyCalendarDates, type DailyCalendar } from './daily-gua';
 import { yearPalaces, palaceAges } from './year-palace';
 import { BRANCHES, STEMS } from '../../ziwei-doushu/lib/ziwei/constants';
 import type { ZiweiChart, Palace } from '../../ziwei-doushu/lib/ziwei/types';
@@ -27,6 +27,7 @@ let targetYear = new Date().getFullYear();
 let guaExample = false;
 let guaAge = 1;
 let guaDate='', guaClock='12:00:00', guaDayError='';
+let guaCalendar:DailyCalendar='solar', guaLeap=false;
 let storageError = false;
 let records: RecordEntry[] = [];
 try {
@@ -60,7 +61,7 @@ function formHTML() {
     <p class="field-note">时辰与准确时间须一致；晚子时请填写23点的准确时间。四柱节气按北京时间计算；本版不自动校正真太阳时。未填准确时间时，命卦按所选时辰中点估算。</p>
     <p id="form-error" role="alert" class="error" hidden></p><button class="primary wide" type="submit">起盘 <span>→</span></button>
     <button type="button" id="sample" class="text-button wide">先看看示例命盘</button>
-  </form><div class="assurance"><span>◌</span><p>本机离线排盘<br><small>出生资料仅保存在这台设备</small></p><span class="seal">天<br>纪</span></div><details class="rules"><summary>版本与开源信息</summary><p>天纪紫微 1.4.0<br>排盘引擎：ziwei-doushu、iztro<br>命卦依据《天机道》独立实现<br><a href="THIRD_PARTY_NOTICES.txt">查看开源许可</a></p></details>`;
+  </form><div class="assurance"><span>◌</span><p>本机离线排盘<br><small>出生资料仅保存在这台设备</small></p><span class="seal">天<br>纪</span></div><details class="rules"><summary>版本与开源信息</summary><p>天纪紫微 1.4.1<br>排盘引擎：ziwei-doushu、iztro<br>命卦依据《天机道》独立实现<br><a href="THIRD_PARTY_NOTICES.txt">查看开源许可</a></p></details>`;
 }
 function starsHTML(p:Palace) {
   const majors=p.stars.filter(s=>s.type==='major');
@@ -111,11 +112,11 @@ function historyHTML() {
 function guaPageHTML() {
   if (!currentInput && !guaExample) return `<section class="page-heading"><span class="eyebrow">四柱 · 先天 · 后天</span><h1>四柱命卦</h1><p>从生辰排先后天卦，查看流年、流月与流日。</p></section><div class="card empty"><span>☰</span><h2>先填写出生信息</h2><p>或查看书中的风水涣例案：<br>一岁元堂九二，后天为地风升。</p><button class="primary" data-page="form">填写生辰</button><button class="text-button wide" data-gua-source="book">查看书中例案</button></div>`;
   try {
-    if (guaExample) return mingguaHTML(textbookExample(),guaAge,true,'',guaDate,guaClock,guaDayError);
+    if (guaExample) return mingguaHTML(textbookExample(),guaAge,true,'',guaDate,guaClock,guaDayError,guaCalendar,guaLeap);
     const context=pillarContext(currentInput!);
     const data=fromPillars(context.pillars,currentInput!.gender,context.birthYear,currentInput!.hour,context.yangSeason);
     const note=`立春换年、节令换月；卦年序归${context.birthYear}（${context.pillars[0]}）年起一岁。${context.estimatedTime?'按时辰中点 '+context.clock+' 估算，交节附近请补准确时分。':'出生时间 '+context.clock+'（北京时间）。'}早晚子时日柱同日，晚子时时柱用次日日干。`;
-    return mingguaHTML(data,guaAge,false,note,guaDate,guaClock,guaDayError);
+    return mingguaHTML(data,guaAge,false,note,guaDate,guaClock,guaDayError,guaCalendar,guaLeap);
   } catch(error) {return `<p class="error">${escape((error as Error).message)}</p><button class="outline" data-page="form">核对出生信息</button>`;}
 }
 function activeMinggua() {
@@ -123,6 +124,11 @@ function activeMinggua() {
   if(!currentInput)throw new Error('请先起盘');
   const c=pillarContext(currentInput);
   return fromPillars(c.pillars,currentInput.gender,c.birthYear,currentInput.hour,c.yangSeason);
+}
+function readDailyForm() {
+  const form=new FormData(root.querySelector<HTMLFormElement>('#daily-form')!);
+  const date=guaCalendar==='solar'?String(form.get('daily-date')||''):`${form.get('daily-year')||''}-${String(form.get('daily-month')||'').padStart(2,'0')}-${String(form.get('daily-day')||'').padStart(2,'0')}`;
+  return {date,clock:String(form.get('daily-clock')||''),leap:form.get('daily-leap')==='on'};
 }
 function readForm(): BirthInput {
   const form=root.querySelector<HTMLFormElement>('#birth-form')!;
@@ -148,13 +154,21 @@ function render() {
   root.querySelectorAll<HTMLButtonElement>('[data-gua-year]').forEach(el=>el.onclick=()=>{if(!currentInput)return;guaExample=false;guaAge=Number(el.dataset.guaYear)-pillarContext(currentInput).birthYear+1;guaDate='';guaDayError='';changePage('gua');});
   root.querySelector<HTMLButtonElement>('[data-gua-current]')?.addEventListener('click',()=>{guaExample=false;guaAge=1;guaDate='';guaDayError='';changePage('gua');});
   root.querySelector<HTMLFormElement>('#daily-form')?.addEventListener('submit',e=>{
-    e.preventDefault();const form=new FormData(e.currentTarget as HTMLFormElement);
-    guaDate=String(form.get('daily-date')||'');guaClock=String(form.get('daily-clock')||'');guaDayError='';
-    try{guaAge=dailyFromDate(activeMinggua(),guaDate,guaClock).age;}catch(error){guaDayError=(error as Error).message;}
+    e.preventDefault();const query=readDailyForm();
+    guaDate=query.date;guaClock=query.clock;guaLeap=query.leap;guaDayError='';
+    try{guaAge=dailyFromDate(activeMinggua(),dailySolarDate(guaCalendar,guaDate,guaLeap),guaClock).age;}catch(error){guaDayError=(error as Error).message;}
     render();root.querySelector('#daily-gua')?.scrollIntoView({block:'start'});
   });
+  root.querySelectorAll<HTMLButtonElement>('[data-daily-calendar]').forEach(el=>el.onclick=()=>{
+    const next=el.dataset.dailyCalendar as DailyCalendar;if(next===guaCalendar)return;
+    try{const query=readDailyForm(),solar=dailySolarDate(guaCalendar,query.date,query.leap),dates=dailyCalendarDates(solar);
+      guaCalendar=next;guaDate=next==='lunar'?dates.lunar:dates.solar;guaLeap=dates.leap;guaClock=query.clock;guaDayError='';
+      try{guaAge=dailyFromDate(activeMinggua(),solar,guaClock).age;}catch(error){guaDayError=(error as Error).message;}
+      render();root.querySelector('#daily-gua')?.scrollIntoView({block:'start'});
+    }catch(error){toast((error as Error).message);}
+  });
   root.querySelectorAll<HTMLButtonElement>('[data-gua-month]').forEach(el=>el.onclick=()=>{
-    try{const m=activeMinggua(),moment=solarMonthStart(m.birthYear+guaAge-1,Number(el.dataset.guaMonth));guaDate=moment.slice(0,10);guaClock=moment.slice(11);guaDayError='';render();root.querySelector('#daily-gua')?.scrollIntoView({block:'start'});}catch(error){toast((error as Error).message);}
+    try{const m=activeMinggua(),moment=solarMonthStart(m.birthYear+guaAge-1,Number(el.dataset.guaMonth)),dates=dailyCalendarDates(moment.slice(0,10));guaDate=guaCalendar==='lunar'?dates.lunar:dates.solar;guaLeap=dates.leap;guaClock=moment.slice(11);guaDayError='';render();root.querySelector('#daily-gua')?.scrollIntoView({block:'start'});}catch(error){toast((error as Error).message);}
   });
   root.querySelector<HTMLInputElement>('#show-ages')?.addEventListener('change',e=>{showPalaceAges=(e.target as HTMLInputElement).checked;try{localStorage.setItem('tianji-show-ages-v1',String(showPalaceAges));}catch{toast('显示设置未能保存，本次切换仍有效');}render();});
   root.querySelector<HTMLSelectElement>('#chart-brightness')?.addEventListener('change',e=>{if(!currentInput)return;const input={...currentInput,brightness:(e.target as HTMLSelectElement).value as BirthInput['brightness']};chart=makeChart(input);currentInput=input;draft={...input};render();});

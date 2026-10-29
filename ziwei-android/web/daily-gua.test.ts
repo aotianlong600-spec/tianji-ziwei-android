@@ -1,5 +1,5 @@
 import { strict as assert } from 'node:assert';
-import { dailyGua, dailyFromDate, solarMonthStart } from './daily-gua';
+import { dailyGua, dailyFromDate, solarMonthStart, dailySolarDate, dailyCalendarDates, type DailyCalendar } from './daily-gua';
 import { hexName, textbookExample } from './minggua';
 
 const monthly={code:16,line:1};
@@ -95,3 +95,30 @@ try {
   else process.env.TZ=originalTimezone;
 }
 console.log('流日卦测试通过：独立月卦组、交节秒、24小时日界、跨年小寒、31日起待核及输入边界');
+
+assert.equal(dailySolarDate('lunar','2020-04-03',true),'2020-05-25','农历闰月按真实日历换算，不作下月安星处理');
+assert.equal(dailySolarDate('lunar','2020-04-03',false),'2020-04-25');
+assert.equal(dailySolarDate('solar','2020-05-25',true),'2020-05-25','公历输入忽略保留的农历闰月标记');
+assert.equal(dailySolarDate('lunar','2020-04-30',false),'2020-05-22','正常四月允许三十日');
+assert.equal(dailySolarDate('lunar','2020-04-29',true),'2020-06-20','闰四月末日为廿九');
+assert.deepEqual(dailyCalendarDates('2020-05-25'),{solar:'2020-05-25',lunar:'2020-04-03',leap:true,lunarLabel:'2020年闰4月3日'});
+assert.deepEqual(dailyCalendarDates('2020-04-25'),{solar:'2020-04-25',lunar:'2020-04-03',leap:false,lunarLabel:'2020年4月3日'});
+for(const solar of ['1900-01-01','2000-02-29','2020-04-25','2020-05-25','2026-12-31','2051-01-01','2200-12-31']) {
+  const converted=dailyCalendarDates(solar);
+  assert.equal(dailySolarDate('lunar',converted.lunar,converted.leap),solar,'农历公历往返保持同一天');
+  assert.equal(dailySolarDate('solar',solar),solar);
+}
+assert.equal(dailySolarDate('lunar','1899-12-01'),'1900-01-01');
+assert.equal(dailyCalendarDates('1900-01-01').lunar,'1899-12-01');
+assert.equal(dailyCalendarDates('2200-12-31').lunar,'2200-11-25');
+for(const [date,leap] of [['2021-04-03',true],['2020-04-30',true],['2020-01-30',false],['1899-11-30',false],['2200-12-01',false],['2020-00-01',false],['2020-13-01',false],['2020-04-00',false],['2020-04-31',false],['1898-12-01',false],['2201-01-01',false],['2020-4-03',false],['2020-04-3',false],['2020-04-03 ',false]] as const) {
+  assert.throws(()=>dailySolarDate('lunar',date,leap),/农历|公历|日期/);
+}
+for(const invalid of ['2026-02-29','1899-12-31','2201-01-01','2026-13-01','2026-01-00','2026-2-04']) {
+  assert.throws(()=>dailySolarDate('solar',invalid),/公历|日期/);
+  assert.throws(()=>dailyCalendarDates(invalid),/公历|日期/);
+}
+assert.throws(()=>dailySolarDate('invalid' as DailyCalendar,'2020-04-03'),/历法/);
+const fromLunar=dailySolarDate('lunar','2020-04-03',true);
+assert.deepEqual(dailyFromDate(data,fromLunar,'23:48:21'),dailyFromDate(data,'2020-05-25','23:48:21'),'历法显示切换不改变北京时间及流日结果');
+console.log('流日公农历换算测试通过：闰月、29/30日、往返、1900与2200边界、同一北京时间同一卦');
