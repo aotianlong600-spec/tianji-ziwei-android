@@ -1,15 +1,28 @@
 import { annualGua, monthGuas, hexName, lineName, type Gua, type Minggua, type Period } from './minggua';
+import { dailyFromDate, solarMonthStart } from './daily-gua';
 
-export function guaDiagram(g:Gua,ranges?:Period[]) {
-  return `<div class="hexagram ${ranges?'has-ranges':''}" aria-label="${hexName(g.code)}，元堂${lineName(g.code,g.line)}">${[6,5,4,3,2,1].map(line=>{const period=ranges?.find(p=>p.line===line);return `<div class="yao ${g.line===line?'yuantang':''}">${g.line===line?'<i>元堂</i>':''}${g.code&(1<<(line-1))?'<span class="yang-line"></span>':'<span></span><span></span>'}<small>${line}</small>${period?`<b class="yao-age">${String(period.startAge).padStart(2,'0')}–${String(period.endAge).padStart(2,'0')}岁</b>`:''}</div>`}).join('')}</div>`;
+export function guaDiagram(g:Gua,ranges?:Period[],mark='元堂') {
+  return `<div class="hexagram ${ranges?'has-ranges':''}" aria-label="${hexName(g.code)}，${mark}${lineName(g.code,g.line)}">${[6,5,4,3,2,1].map(line=>{const period=ranges?.find(p=>p.line===line);return `<div class="yao ${g.line===line?'yuantang':''}">${g.line===line?`<i>${mark}</i>`:''}${g.code&(1<<(line-1))?'<span class="yang-line"></span>':'<span></span><span></span>'}<small>${line}</small>${period?`<b class="yao-age">${String(period.startAge).padStart(2,'0')}–${String(period.endAge).padStart(2,'0')}岁</b>`:''}</div>`}).join('')}</div>`;
 }
 const monthNames=['正月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
 const terms=['立春','惊蛰','清明','立夏','芒种','小暑','立秋','白露','寒露','立冬','大雪','小寒'];
-export function mingguaHTML(data:Minggua,age:number,example:boolean,timeNote:string) {
+const escaped=(value:string)=>value.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
+function dailyPanel(data:Minggua,age:number,date:string,clock:string,error:string) {
+  const first=solarMonthStart(data.birthYear+age-1,1);
+  const defaultMoment=first<'1900-01-01 00:00:00'?'1900-01-01 12:00:00':first;
+  const queryDate=date||defaultMoment.slice(0,10), queryClock=date?clock:defaultMoment.slice(11);
+  let content='';
+  try {
+    const r=dailyFromDate(data,queryDate,queryClock);
+    content=`<p class="daily-context">${r.flowYear}年 · ${monthNames[r.month-1]}（${r.term}起）<br>年卦 ${hexName(r.annual.code)} → 月卦 ${hexName(r.monthly.code)}</p>${r.daily?`<div class="annual-main">${guaDiagram(r.daily,undefined,'值日')}<div><span class="eyebrow">交节后第${r.dayIndex}日</span><h2>${hexName(r.daily.code)}</h2><p>值日爻 ${lineName(r.daily.code,r.daily.line)}</p><small>第${r.daily.group}组六日卦</small></div></div><p class="daily-method">本组六日卦：从月卦${lineName(r.monthly.code,r.daily.changeLine)}变出。<br>图中红爻标示当日值爻。</p>`:`<p class="gua-notice daily-pending" role="status">${escaped(r.pendingReason)}</p>`}<dl class="daily-interval"><dt>当值区间（北京时间）</dt><dd>${r.intervalStart} 起<br>至 ${r.intervalEnd} 前</dd><dt>本节令月</dt><dd>${r.monthStart} 起<br>至 ${r.monthEnd} 前</dd></dl>`;
+  } catch(e) {error=error||(e as Error).message;}
+  return `<section class="card daily-gua" id="daily-gua"><div class="section-head"><h2>流日卦</h2><span>按精确交节时刻</span></div><form id="daily-form"><div class="daily-fields"><label class="field">公历日期<input name="daily-date" type="date" min="1900-01-01" max="2200-12-31" value="${escaped(queryDate)}" required></label><label class="field">北京时间<input name="daily-clock" type="time" step="1" value="${escaped(queryClock)}" required></label></div><button class="outline wide" type="submit">查询流日</button></form>${error?`<p class="error" role="alert">${escaped(error)}</p>`:''}${content}<p class="field-note">从交节时刻起，每24小时行一爻，每六日一卦。每组六日卦均从原月卦变化；到下一节即换月。第31日起的接续规则尚待核实，暂不排日卦。</p></section>`;
+}
+export function mingguaHTML(data:Minggua,age:number,example:boolean,timeNote:string,date='',clock='12:00:00',dayError='') {
   const current=annualGua(data,age);
   const yearly=monthGuas(current);
   const beforeEnd=data.periods.filter(p=>p.phase==='先天').slice(-1)[0].endAge;
-  return `<section class="page-heading"><span class="eyebrow">四柱为始 · 天地相荡</span><h1>先后天命卦</h1><p>先天、后天与逐年逐月的卦象变化。</p></section>
+  return `<section class="page-heading"><span class="eyebrow">四柱为始 · 天地相荡</span><h1>先后天命卦</h1><p>先天、后天与逐年、逐月、逐日的卦象变化。</p></section>
     <div class="segmented gua-source"><button data-gua-source="birth" class="${example?'':'active'}">当前生辰</button><button data-gua-source="book" class="${example?'active':''}">书中例案</button></div>
     ${example?'<div class="gua-notice">书中例案：阳男、卯时。一岁元堂在九二。<br>此例按四柱干支演示，甲午年以1954作年序锚点，不代表公历生日。</div>':`<p class="gua-time-note">${timeNote}</p>`}
     <div class="card pillar-card">${data.pillars.map((p,i)=>`<div><small>${['年柱','月柱','日柱','时柱'][i]}</small><b>${p[0]}</b><b>${p[1]}</b></div>`).join('')}</div>
@@ -17,8 +30,10 @@ export function mingguaHTML(data:Minggua,age:number,example:boolean,timeNote:str
     <details class="card gua-calculation"><summary>起卦过程与采用规则</summary><p>天数 ${data.heavenSum} → 采用数 ${data.heavenNumber}<br>地数 ${data.earthSum} → 采用数 ${data.earthNumber}<br>天数取5时按巽4；地数5按原书三元寄宫。</p><ul>${data.notes.map(note=>`<li>${note.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]!))}</li>`).join('')}</ul></details>
     <section class="annual-gallery"><div class="section-head"><h2>流年卦</h2><label>查看虚岁<select id="gua-age">${Array.from({length:data.periods.slice(-1)[0].endAge},(_,i)=>`<option value="${i+1}" ${i+1===age?'selected':''}>${i+1}岁 · ${data.birthYear+i}年</option>`).join('')}</select></label></div><p class="gua-month-origin">${data.birthYear+current.period.startAge-1}年${current.period.startAge}岁至${data.birthYear+current.period.endAge-1}年${current.period.endAge}岁 · 左右滑动，点击年份查看</p><div class="year-strip">${Array.from({length:current.period.endAge-current.period.startAge+1},(_,i)=>{const a=current.period.startAge+i,g=annualGua(data,a);return `<button class="card year-gua ${a===age?'active':''}" data-gua-age="${a}" aria-label="查看${g.year}年${a}岁${hexName(g.code)}"><h3>${hexName(g.code)}</h3>${guaDiagram(g)}<strong>${g.year}年 · ${a}岁</strong></button>`}).join('')}</div></section>
     <section class="card annual-gua"><div class="section-head"><h2>${current.year}年流年</h2><span>${current.stemBranch} · ${age}岁</span></div><div class="annual-main">${guaDiagram(current)}<div><span class="eyebrow">${current.period.phase}大运</span><h2>${hexName(current.code)}</h2><p>动爻 ${lineName(current.code,current.line)}</p><small>${current.period.startAge}–${current.period.endAge}岁</small></div></div></section>
-    <section class="gua-months"><div class="section-head"><h2>十二流月卦</h2><span>按节气月序</span></div><p class="gua-month-origin">以当前年卦 ${hexName(current.code)} · ${lineName(current.code,current.line)} 起月卦</p><div class="month-grid">${yearly.map(g=>`<article class="card month-gua"><span>${monthNames[g.month-1]} <small>${terms[g.month-1]}起</small></span><h3>${hexName(g.code)}</h3><p>动爻 ${lineName(g.code,g.line)}</p></article>`).join('')}</div><p class="field-note">单月顺进一爻，双月从前一单月取应爻。本书仅给出阳元堂的完整流月例；阴元堂采用同一顺进法，尚待独立命例核对。</p></section>
+    <section class="gua-months"><div class="section-head"><h2>十二流月卦</h2><span>按节气月序</span></div><p class="gua-month-origin">以当前年卦 ${hexName(current.code)} · ${lineName(current.code,current.line)} 起月卦</p><div class="month-grid">${yearly.map(g=>`<button type="button" class="card month-gua" data-gua-month="${g.month}" aria-label="查看${monthNames[g.month-1]}流日卦"><span>${monthNames[g.month-1]} <small>${terms[g.month-1]}起</small></span><h3>${hexName(g.code)}</h3><p>动爻 ${lineName(g.code,g.line)}</p><small class="month-daily-link">查看流日 ›</small></button>`).join('')}</div><p class="field-note">单月顺进一爻，双月从前一单月取应爻。本书仅给出阳元堂的完整流月例；阴元堂采用同一顺进法，尚待独立命例核对。</p></section>
+    ${dailyPanel(data,age,date,clock,dayError)}
+    <details class="card gua-calculation"><summary>流日起法与书中例案</summary><p>依据《天机道》书55–56页（PDF59–60），以及书60页（PDF64）的交节时刻说明。水地比初爻月卦，第一组六日翻二爻得坎为水，第二组仍从原月卦翻三爻得水山蹇。各组从初爻至上爻，一日一爻；产生六日卦所翻的爻，与当日值爻分别显示。第31日起缺明确接续规则，保留待核。</p></details>
     <details class="card gua-calculation"><summary>对照书中流月例：风雷益五爻</summary><p>该流月例的年卦为益，与上方涣卦出生例不是同一年度。</p><div class="period-table">${monthGuas({code:49,line:5}).map(g=>`<div><b>${monthNames[g.month-1]}</b><span>${hexName(g.code)}</span><span>${lineName(g.code,g.line)}</span></div>`).join('')}</div></details>
     <details class="card gua-calculation"><summary>先后天大运逐爻表</summary><div class="period-table">${data.periods.map(p=>`<div><b>${p.phase}</b><span>${lineName(p.code,p.line)}</span><span>${p.startAge}–${p.endAge}岁</span></div>`).join('')}</div></details>
-    <p class="rules">依据《天机道》书内44–55页，包含书中例案的图文校勘。<br>“天数5按4”按你的指定口径执行。</p>`;
+    <p class="rules">依据《天机道》书内44–56、60页，包含书中例案的图文校勘。<br>“天数5按4”按你的指定口径执行。</p>`;
 }

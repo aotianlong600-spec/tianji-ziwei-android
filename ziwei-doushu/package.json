@@ -1,10 +1,10 @@
 {
   "name": "tianji-ziwei-engine",
-  "version": "1.3.1",
+  "version": "1.4.0",
   "private": true,
   "license": "MIT",
   "scripts": {
-    "test": "tsx --tsconfig=../ziwei-android/tsconfig.json ../ziwei-android/web/model.test.ts && tsx ../ziwei-android/web/minggua.test.ts && tsx --tsconfig=../ziwei-android/tsconfig.json ../ziwei-android/web/year-palace.test.ts",
+    "test": "tsx --tsconfig=../ziwei-android/tsconfig.json ../ziwei-android/web/model.test.ts && tsx ../ziwei-android/web/minggua.test.ts && tsx --tsconfig=../ziwei-android/tsconfig.json ../ziwei-android/web/year-palace.test.ts && tsx --tsconfig=../ziwei-android/tsconfig.json ../ziwei-android/web/daily-gua.test.ts",
     "typecheck": "tsc -p ../ziwei-android/tsconfig.json",
     "build:web": "node ../ziwei-android/build-web.cjs"
   },

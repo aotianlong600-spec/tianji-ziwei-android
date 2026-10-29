@@ -1,6 +1,7 @@
 import { makeChart, toBirthInfo, actualLunarLabel, pillarContext, type BirthInput } from './model';
 import { fromPillars, textbookExample, annualGua, hexName, lineName } from './minggua';
 import { mingguaHTML, guaDiagram } from './minggua-view';
+import { dailyFromDate, solarMonthStart } from './daily-gua';
 import { yearPalaces, palaceAges } from './year-palace';
 import { BRANCHES, STEMS } from '../../ziwei-doushu/lib/ziwei/constants';
 import type { ZiweiChart, Palace } from '../../ziwei-doushu/lib/ziwei/types';
@@ -25,6 +26,7 @@ let periodIndex = 0;
 let targetYear = new Date().getFullYear();
 let guaExample = false;
 let guaAge = 1;
+let guaDate='', guaClock='12:00:00', guaDayError='';
 let storageError = false;
 let records: RecordEntry[] = [];
 try {
@@ -58,7 +60,7 @@ function formHTML() {
     <p class="field-note">时辰与准确时间须一致；晚子时请填写23点的准确时间。四柱节气按北京时间计算；本版不自动校正真太阳时。未填准确时间时，命卦按所选时辰中点估算。</p>
     <p id="form-error" role="alert" class="error" hidden></p><button class="primary wide" type="submit">起盘 <span>→</span></button>
     <button type="button" id="sample" class="text-button wide">先看看示例命盘</button>
-  </form><div class="assurance"><span>◌</span><p>本机离线排盘<br><small>出生资料仅保存在这台设备</small></p><span class="seal">天<br>纪</span></div><details class="rules"><summary>版本与开源信息</summary><p>天纪紫微 1.3.1<br>排盘引擎：ziwei-doushu、iztro<br>命卦依据《天机道》独立实现<br><a href="THIRD_PARTY_NOTICES.txt">查看开源许可</a></p></details>`;
+  </form><div class="assurance"><span>◌</span><p>本机离线排盘<br><small>出生资料仅保存在这台设备</small></p><span class="seal">天<br>纪</span></div><details class="rules"><summary>版本与开源信息</summary><p>天纪紫微 1.4.0<br>排盘引擎：ziwei-doushu、iztro<br>命卦依据《天机道》独立实现<br><a href="THIRD_PARTY_NOTICES.txt">查看开源许可</a></p></details>`;
 }
 function starsHTML(p:Palace) {
   const majors=p.stars.filter(s=>s.type==='major');
@@ -107,14 +109,20 @@ function historyHTML() {
   return `<section class="page-heading"><span class="eyebrow">属于你的命盘簿</span><h1>我的命盘 <small>${records.length}</small></h1><p>保存在本机，随时打开继续查看。</p></section>${storageError?'<p class="error">本机档案读取失败，为避免覆盖，暂时不能保存新档案。</p>':''}${records.length?records.map(r=>`<article class="card record"><button class="record-open" data-record="${escape(r.id)}"><span class="record-emblem">${escape((r.input.name||'命')[0])}</span><span><b>${escape(r.input.name||'未命名命盘')}</b><small>${r.input.year}年${r.input.leap&&r.input.calendar==='lunar'?'闰':''}${r.input.month}月${r.input.day}日 · ${r.input.calendar==='lunar'?'农历':'公历'}<br>${BRANCHES[r.input.hour]}时 · ${r.input.gender==='male'?'男':'女'}</small></span><span class="record-arrow">↗</span></button><button class="delete" data-delete="${escape(r.id)}" aria-label="删除${escape(r.input.name||'命盘')}">删除</button></article>`).join(''):`<div class="card empty"><span>▤</span><h2>把重要的命盘留在这里</h2><p>起盘后点击“保存到我的命盘”，<br>下次打开即可继续查看。</p><button class="primary" data-page="form">新建命盘</button></div>`}<p class="rules">资料保存在应用内。卸载应用会删除本机档案。</p>`;
 }
 function guaPageHTML() {
-  if (!currentInput && !guaExample) return `<section class="page-heading"><span class="eyebrow">四柱 · 先天 · 后天</span><h1>四柱命卦</h1><p>从生辰排先后天卦，查看流年与十二流月。</p></section><div class="card empty"><span>☰</span><h2>先填写出生信息</h2><p>或查看书中的风水涣例案：<br>一岁元堂九二，后天为地风升。</p><button class="primary" data-page="form">填写生辰</button><button class="text-button wide" data-gua-source="book">查看书中例案</button></div>`;
+  if (!currentInput && !guaExample) return `<section class="page-heading"><span class="eyebrow">四柱 · 先天 · 后天</span><h1>四柱命卦</h1><p>从生辰排先后天卦，查看流年、流月与流日。</p></section><div class="card empty"><span>☰</span><h2>先填写出生信息</h2><p>或查看书中的风水涣例案：<br>一岁元堂九二，后天为地风升。</p><button class="primary" data-page="form">填写生辰</button><button class="text-button wide" data-gua-source="book">查看书中例案</button></div>`;
   try {
-    if (guaExample) return mingguaHTML(textbookExample(),guaAge,true,'');
+    if (guaExample) return mingguaHTML(textbookExample(),guaAge,true,'',guaDate,guaClock,guaDayError);
     const context=pillarContext(currentInput!);
     const data=fromPillars(context.pillars,currentInput!.gender,context.birthYear,currentInput!.hour,context.yangSeason);
     const note=`立春换年、节令换月；卦年序归${context.birthYear}（${context.pillars[0]}）年起一岁。${context.estimatedTime?'按时辰中点 '+context.clock+' 估算，交节附近请补准确时分。':'出生时间 '+context.clock+'（北京时间）。'}早晚子时日柱同日，晚子时时柱用次日日干。`;
-    return mingguaHTML(data,guaAge,false,note);
+    return mingguaHTML(data,guaAge,false,note,guaDate,guaClock,guaDayError);
   } catch(error) {return `<p class="error">${escape((error as Error).message)}</p><button class="outline" data-page="form">核对出生信息</button>`;}
+}
+function activeMinggua() {
+  if(guaExample)return textbookExample();
+  if(!currentInput)throw new Error('请先起盘');
+  const c=pillarContext(currentInput);
+  return fromPillars(c.pillars,currentInput.gender,c.birthYear,currentInput.hour,c.yangSeason);
 }
 function readForm(): BirthInput {
   const form=root.querySelector<HTMLFormElement>('#birth-form')!;
@@ -124,7 +132,7 @@ function readForm(): BirthInput {
 function openInput(input:BirthInput) {
   try {
     const next=makeChart(input);
-    draft={...input}; currentInput={...input}; chart=next; selected=null; period='natal'; guaExample=false; guaAge=1; periodIndex=Math.max(0,next.currentDaXianIndex); changePage('chart');
+    draft={...input}; currentInput={...input}; chart=next; selected=null; period='natal'; guaExample=false; guaAge=1;guaDate='';guaDayError=''; periodIndex=Math.max(0,next.currentDaXianIndex); changePage('chart');
   } catch(e) { toast(e instanceof Error?e.message:'起盘失败，请核对出生信息'); }
 }
 function store(next:RecordEntry[]) {
@@ -134,11 +142,20 @@ function store(next:RecordEntry[]) {
 function render() {
   root.innerHTML=`<header class="topbar"><span class="brand"><i>✦</i> 天纪紫微</span><span class="offline"><i></i> 离线排盘</span></header><main>${page==='form'?formHTML():page==='chart'?chartHTML():page==='gua'?guaPageHTML():historyHTML()}</main><nav class="bottom-nav" aria-label="主导航">${(['form','chart','gua','history'] as Page[]).map(p=>`<button data-page="${p}" class="${page===p?'active':''}" ${page===p?'aria-current="page"':''}><span>${icon(p)}</span>${{form:'起盘',chart:'命盘',gua:'命卦',history:'档案'}[p]}</button>`).join('')}</nav>`;
   root.querySelectorAll<HTMLButtonElement>('[data-page]').forEach(el=>el.onclick=()=>changePage(el.dataset.page as Page));
-  root.querySelectorAll<HTMLButtonElement>('[data-gua-source]').forEach(el=>el.onclick=()=>{guaExample=el.dataset.guaSource==='book';guaAge=1;changePage('gua');});
-  root.querySelector<HTMLSelectElement>('#gua-age')?.addEventListener('change',e=>{guaAge=Number((e.target as HTMLSelectElement).value);render();});
-  root.querySelectorAll<HTMLButtonElement>('[data-gua-age]').forEach(el=>el.onclick=()=>{const scroll=root.querySelector('.year-strip')?.scrollLeft||0;guaAge=Number(el.dataset.guaAge);render();const strip=root.querySelector('.year-strip');if(strip)strip.scrollLeft=scroll;});
-  root.querySelectorAll<HTMLButtonElement>('[data-gua-year]').forEach(el=>el.onclick=()=>{if(!currentInput)return;guaExample=false;guaAge=Number(el.dataset.guaYear)-pillarContext(currentInput).birthYear+1;changePage('gua');});
-  root.querySelector<HTMLButtonElement>('[data-gua-current]')?.addEventListener('click',()=>{guaExample=false;guaAge=1;changePage('gua');});
+  root.querySelectorAll<HTMLButtonElement>('[data-gua-source]').forEach(el=>el.onclick=()=>{guaExample=el.dataset.guaSource==='book';guaAge=1;guaDate='';guaDayError='';changePage('gua');});
+  root.querySelector<HTMLSelectElement>('#gua-age')?.addEventListener('change',e=>{guaAge=Number((e.target as HTMLSelectElement).value);guaDate='';guaDayError='';render();});
+  root.querySelectorAll<HTMLButtonElement>('[data-gua-age]').forEach(el=>el.onclick=()=>{const scroll=root.querySelector('.year-strip')?.scrollLeft||0;guaAge=Number(el.dataset.guaAge);guaDate='';guaDayError='';render();const strip=root.querySelector('.year-strip');if(strip)strip.scrollLeft=scroll;});
+  root.querySelectorAll<HTMLButtonElement>('[data-gua-year]').forEach(el=>el.onclick=()=>{if(!currentInput)return;guaExample=false;guaAge=Number(el.dataset.guaYear)-pillarContext(currentInput).birthYear+1;guaDate='';guaDayError='';changePage('gua');});
+  root.querySelector<HTMLButtonElement>('[data-gua-current]')?.addEventListener('click',()=>{guaExample=false;guaAge=1;guaDate='';guaDayError='';changePage('gua');});
+  root.querySelector<HTMLFormElement>('#daily-form')?.addEventListener('submit',e=>{
+    e.preventDefault();const form=new FormData(e.currentTarget as HTMLFormElement);
+    guaDate=String(form.get('daily-date')||'');guaClock=String(form.get('daily-clock')||'');guaDayError='';
+    try{guaAge=dailyFromDate(activeMinggua(),guaDate,guaClock).age;}catch(error){guaDayError=(error as Error).message;}
+    render();root.querySelector('#daily-gua')?.scrollIntoView({block:'start'});
+  });
+  root.querySelectorAll<HTMLButtonElement>('[data-gua-month]').forEach(el=>el.onclick=()=>{
+    try{const m=activeMinggua(),moment=solarMonthStart(m.birthYear+guaAge-1,Number(el.dataset.guaMonth));guaDate=moment.slice(0,10);guaClock=moment.slice(11);guaDayError='';render();root.querySelector('#daily-gua')?.scrollIntoView({block:'start'});}catch(error){toast((error as Error).message);}
+  });
   root.querySelector<HTMLInputElement>('#show-ages')?.addEventListener('change',e=>{showPalaceAges=(e.target as HTMLInputElement).checked;try{localStorage.setItem('tianji-show-ages-v1',String(showPalaceAges));}catch{toast('显示设置未能保存，本次切换仍有效');}render();});
   root.querySelector<HTMLSelectElement>('#chart-brightness')?.addEventListener('change',e=>{if(!currentInput)return;const input={...currentInput,brightness:(e.target as HTMLSelectElement).value as BirthInput['brightness']};chart=makeChart(input);currentInput=input;draft={...input};render();});
   root.querySelector<HTMLFormElement>('#birth-form')?.addEventListener('submit',e=>{
