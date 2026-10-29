@@ -24,6 +24,11 @@ assert.equal(ziweiBrightness('ZZ'),'陷');
 assert.equal(ziweiBrightness('QS'),'得');
 assert.equal(ziweiBrightness('ZZ'),'陷','切换亮度表不残留上一张表');
 console.log('合成日期紫微亮度及表切换测试通过');
+for(const hour of [4,10]) {
+  const seal=(brightness:'DOC'|'ZZ')=>makeChart({...brightnessCase,hour,brightness}).palaces.flatMap(p=>p.stars).find(s=>s.name==='封诰')!;
+  assert.equal(seal('DOC').brightnessRaw,'庙','封诰子午按重复盘例补庙');
+  assert.equal(seal('ZZ').brightnessRaw,undefined,'盘例补值不改动中州原表');
+}
 assert.equal(pillarContext({...base,hour:1,clock:'02:30'}).birthYear,2003);
 assert.equal(pillarContext({...base,hour:11,clock:'21:30'}).birthYear,2004);
 console.log('先后天卦与立春归年、同日交节前后年序核对通过');

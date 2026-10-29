@@ -33,10 +33,11 @@ export function makeChart(input: BirthInput) {
   setBrightnessSchool(profile==='DOC'?'ZZ':profile);
   const chart=generateChart(birth);
   if(profile==='DOC') {
-    // 天纪盘例对照表的三处约定修订；其他亮度沿用中州表。
+    // 主星三处修订及重复盘例确认的封诰子午；未覆盖项沿用中州表。
     for(const palace of chart.palaces) for(const star of palace.stars) {
       if((star.name==='天梁'&&palace.branch===9)||(star.name==='贪狼'&&palace.branch===3)) {star.brightnessRaw='地';star.brightness='normal';}
       if(star.name==='天相'&&palace.branch===10) {star.brightnessRaw='庙';star.brightness='bright';}
+      if(star.name==='封诰'&&(palace.branch===0||palace.branch===6)) {star.brightnessRaw='庙';star.brightness='bright';}
     }
   }
   return chart;

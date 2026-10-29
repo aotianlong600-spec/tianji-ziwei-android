@@ -12,7 +12,7 @@ for(const name of Object.keys(result.metafile.inputs)) {
   const pieces=abs.slice(at+14).split('/');
   packages.add(abs.slice(0,at+14)+pieces.slice(0,pieces[0].startsWith('@')?2:1).join('/'));
 }
-let notices='天纪紫微 1.3.0\n四柱命卦按《天机道》表例独立实现；天数5按4为本项目约定口径。\n紫微流年小限、年支太岁、四柱流年卦分别计算；命卦以立春年柱归年起算。\n亮度盘例对照表以中州表为底，含三处约定修订；小星亮度沿用所选表。\n\n排盘引擎来源：Renhuai123/ziwei-doushu（本地修订）\n\n'+fs.readFileSync(path.join(__dirname,'../ziwei-doushu/LICENSE'),'utf8');
+let notices='天纪紫微 1.3.1\n四柱命卦按《天机道》表例独立实现；天数5按4为本项目约定口径。\n紫微流年小限、年支太岁、四柱流年卦分别计算；命卦以立春年柱归年起算。\n亮度盘例对照表以中州表为底，主星含三处约定修订；小星封诰子午按重复盘例补庙，其他沿用所选表。\n\n排盘引擎来源：Renhuai123/ziwei-doushu（本地修订）\n\n'+fs.readFileSync(path.join(__dirname,'../ziwei-doushu/LICENSE'),'utf8');
 for(const dir of packages) {
   const metadata=JSON.parse(fs.readFileSync(path.join(dir,'package.json'),'utf8'));
   const license=fs.readdirSync(dir).find(name=>/^licen[cs]e(?:\.|$)/i.test(name));

@@ -1,13 +1,13 @@
 # 天纪紫微 Android
 
-离线紫微斗数与四柱命卦工具，Android 8.0 及以上。原生 Java Activity 加本地 WebView；无需账号，不请求联网、定位或存储权限，档案仅保存在本机。当前版本 **1.3.0**。
+离线紫微斗数与四柱命卦工具，Android 8.0 及以上。原生 Java Activity 加本地 WebView；无需账号，不请求联网、定位或存储权限，档案仅保存在本机。当前版本 **1.3.1**。
 
 [下载安装包](https://github.com/aotianlong600-spec/tianji-ziwei-android/releases/latest) · [算法口径与局限](ziwei-android/MINGGUA-SOURCES.md) · [MIT 许可证](LICENSE)
 
 ## 功能
 
 - 公历、农历、闰月输入；十二宫、主辅杂曜、生年四化、身宫、三方四正。
-- 每宫显示大限年龄段及对应的 **1–120 虚岁小限列表**；切换流年突出当年岁数，太岁另标。
+- 宫名统一固定在各宫右下方；每宫紧凑显示大限年龄段与 **1–60虚岁流年列表**。可用开关隐藏流年岁数，自动记住选择；60岁以后仍可查询，太岁另标。
 - 主星与小星显示所选表中收录的庙旺等亮度；未收录或留白项不推测补值。提供天纪盘例对照、中州与斗数全书三种亮度表。
 - 宫位时辰用“子、丑、寅……”单字标记；四柱竖列、公历农历、先后天卦放在命盘中央。
 - 独立命卦页显示先后天卦、元堂、逐爻年龄段、可点击的流年及十二流月。
@@ -35,7 +35,7 @@ cd ../ziwei-android
 ./build.ps1 -Sdk "你的 Android SDK 目录"
 ```
 
-也可设置 `ANDROID_HOME` 后省略 `-Sdk`。APK 输出到 `ziwei-android/build/tianji-ziwei.apk`。浏览器预览可使用任意静态服务器打开 `ziwei-android/build/assets`。
+也可设置 `ANDROID_HOME` 后省略 `-Sdk`。APK 输出到 `ziwei-android/build/tianji-ziwei.apk`。浏览器预览可使用任意静态服务器打开 `ziwei-android/build/assets/`。
 
 脚本首次构建会生成本地开发签名，密钥不会进入 Git。Release APK 也使用开发签名供试用；自行编译产生的签名不同，不能直接覆盖安装此 APK。保留自己的签名密钥，避免升级时丢失覆盖安装能力；卸载会删除档案。
 
@@ -45,4 +45,4 @@ cd ../ziwei-android
 
 四柱命卦独立编写，参考《天纪·天机道》的规则及例案。仓库只包含程序、规则说明和合成测试，不包含参考书全文、私人档案、原始盘例文档、签名密钥或个人截图。传统术数工具用于研究，未验证其预测效力。
 
-本项目源码采用 MIT。上游及依赖许可见 [ATTRIBUTION.md](ATTRIBUTION.md)。已执行算法回归、类型检查及 APK 签名验证；尚未完成安卓真机兼容性测试。
+本项目源码采用 MIT。上游及依赖许可见 [ATTRIBUTION.md](ATTRIBUTION.md)。已执行算法回归、类型检查及 APK 签名验证；文档复核范围与已知冲突见 [VERIFICATION.md](ziwei-android/VERIFICATION.md)。尚未完成安卓真机兼容性测试。
