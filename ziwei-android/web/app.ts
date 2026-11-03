@@ -1,6 +1,7 @@
 import { makeChart, toBirthInfo, actualLunarLabel, pillarContext, type BirthInput } from './model';
 import { fromPillars, textbookExample, annualGua, hexName, lineName } from './minggua';
 import { mingguaHTML, guaDiagram } from './minggua-view';
+import { commentaryHTML } from './gua-commentary';
 import { dailyFromDate, solarMonthStart, dailySolarDate, dailyCalendarDates, type DailyCalendar } from './daily-gua';
 import { yearPalaces, palaceAges } from './year-palace';
 import { BRANCHES, STEMS } from '../../ziwei-doushu/lib/ziwei/constants';
@@ -8,6 +9,30 @@ import type { ZiweiChart, Palace } from '../../ziwei-doushu/lib/ziwei/types';
 
 let showPalaceAges=true;
 try {showPalaceAges=localStorage.getItem('tianji-show-ages-v1')!=='false';} catch {}
+type ThemeMode='system'|'light'|'dark';
+declare global { interface Window { AndroidTheme?:{isDark:()=>boolean;setDark:(dark:boolean)=>void}; } }
+let themeMode:ThemeMode='system', hideBirth=false, hideCenterGua=false;
+try {
+  const stored=localStorage.getItem('tianji-color-mode-v1');
+  if(stored==='light'||stored==='dark')themeMode=stored;
+  hideBirth=localStorage.getItem('tianji-hide-birth-v1')==='true';
+  hideCenterGua=localStorage.getItem('tianji-hide-gua-v1')==='true';
+} catch {}
+const systemColor=window.matchMedia('(prefers-color-scheme: dark)');
+let systemDark=window.AndroidTheme?window.AndroidTheme.isDark():systemColor.matches;
+function applyTheme() {
+  const dark=themeMode==='dark'||(themeMode==='system'&&systemDark);
+  document.documentElement.dataset.theme=dark?'dark':'light';
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content',dark?'#18161b':'#f6f2eb');
+  window.AndroidTheme?.setDark(dark);
+}
+const systemColorChanged=()=>{systemDark=window.AndroidTheme?window.AndroidTheme.isDark():systemColor.matches;applyTheme();};
+if(systemColor.addEventListener)systemColor.addEventListener('change',systemColorChanged);
+else systemColor.addListener(systemColorChanged);
+window.addEventListener('systemthemechange',e=>{const dark=(e as CustomEvent<boolean>).detail;if(typeof dark==='boolean'){systemDark=dark;applyTheme();}});
+window.addEventListener('pageshow',systemColorChanged);
+applyTheme();
+
 type RecordEntry = { id: string; input: BirthInput; saved: number };
 type Page = 'form' | 'chart' | 'gua' | 'history';
 const root = document.querySelector<HTMLDivElement>('#app')!;
@@ -47,6 +72,9 @@ function toast(message:string) {
 function changePage(next:Page) { page=next; render(); window.scrollTo(0,0); }
 function option(value:unknown,label:string,current:unknown) { return `<option value="${escape(value)}" ${value===current?'selected':''}>${escape(label)}</option>`; }
 function numeric(value:number) { return Number.isFinite(value)?value:''; }
+function displaySettingsHTML() {
+  return `<div class="display-settings"><label class="theme-control">外观<select id="theme-mode">${option('system','跟随系统',themeMode)}${option('light','浅色',themeMode)}${option('dark','暗色',themeMode)}</select></label><label class="privacy-control" title="展示页隐藏日期、时间与四柱，输入页仍可编辑"><input id="hide-birth" type="checkbox" ${hideBirth?'checked':''}>隐藏生辰</label><label class="privacy-control" title="隐藏十二宫盘心的先天、后天卦，完整命卦页仍可查看"><input id="hide-gua" type="checkbox" ${hideCenterGua?'checked':''}>隐藏卦</label></div>`;
+}
 function formHTML() {
   return `<section class="intro"><span class="eyebrow">始于生辰 · 归于十二宫</span><h1>观星知序<span>天纪紫微</span></h1><p>依据《天机道》排盘表，安星成盘。</p><div class="compass" aria-hidden="true"><span>✦</span></div></section>
   <form id="birth-form" class="card form-card" novalidate>
@@ -61,7 +89,7 @@ function formHTML() {
     <p class="field-note">时辰与准确时间须一致；晚子时请填写23点的准确时间。四柱节气按北京时间计算；本版不自动校正真太阳时。未填准确时间时，命卦按所选时辰中点估算。</p>
     <p id="form-error" role="alert" class="error" hidden></p><button class="primary wide" type="submit">起盘 <span>→</span></button>
     <button type="button" id="sample" class="text-button wide">先看看示例命盘</button>
-  </form><div class="assurance"><span>◌</span><p>本机离线排盘<br><small>出生资料仅保存在这台设备</small></p><span class="seal">天<br>纪</span></div><details class="rules"><summary>版本与开源信息</summary><p>天纪紫微 1.4.2<br>排盘引擎：ziwei-doushu、iztro<br>命卦依据《天机道》独立实现<br><a href="THIRD_PARTY_NOTICES.txt">查看开源许可</a></p></details>`;
+  </form><div class="assurance"><span>◌</span><p>本机离线排盘<br><small>出生资料仅保存在这台设备</small></p><span class="seal">天<br>纪</span></div><details class="rules"><summary>版本与开源信息</summary><p>天纪紫微 1.5.0<br>排盘引擎：ziwei-doushu、iztro<br>命卦依据《天机道》独立实现<br><a href="THIRD_PARTY_NOTICES.txt">查看开源许可</a></p></details>`;
 }
 function starsHTML(p:Palace) {
   const majors=p.stars.filter(s=>s.type==='major');
@@ -89,11 +117,11 @@ function chartHTML() {
     const age=targetYear-minggua.birthYear+1;
     if(age>=1&&age<=minggua.periods.slice(-1)[0].endAge) {
       const annual=annualGua(minggua,age);
-      yearSummary=`<section class="card chart-year-summary"><div>${guaDiagram(annual)}</div><div><span class="eyebrow">四柱流年卦 · ${targetYear} · ${annual.stemBranch}</span><h2>${hexName(annual.code)}</h2><p>命卦第${age}岁 · 动爻 ${lineName(annual.code,annual.line)}</p><button class="text-button" data-gua-year="${targetYear}">查看这一年与十二流月 →</button></div></section>`;
+      yearSummary=`<section class="card chart-year-summary"><div>${guaDiagram(annual)}</div><div><span class="eyebrow">四柱流年卦 · ${targetYear} · ${annual.stemBranch}</span><h2>${hexName(annual.code)}</h2><p>命卦第${age}岁 · 动爻 ${lineName(annual.code,annual.line)}</p><button class="text-button" data-gua-year="${targetYear}">查看这一年与十二流月 →</button></div></section>${commentaryHTML(annual.code,'annual')}`;
     } else yearSummary='<p class="field-note">所选年份不在这张命卦的先后天大运范围内。</p>';
   }
-  return `<section class="chart-heading"><div><span class="eyebrow">ZI WEI DOU SHU</span><h1>${escape(currentInput.name || '未命名命盘')}</h1><p>${b.year}.${String(b.month).padStart(2,'0')}.${String(b.day).padStart(2,'0')} · ${BRANCHES[b.hour]}时 · ${b.gender==='male'?'男':'女'}</p></div><button class="outline" id="edit">修改</button></section>
-    <div class="lunar-line">农历 ${escape(actualLunarLabel(currentInput))}<span>${escape(c.yinYangGender || '')} · ${c.wuxingJuName}</span></div>
+  return `<section class="chart-heading"><div><span class="eyebrow">ZI WEI DOU SHU</span><h1>${escape(currentInput.name || '未命名命盘')}</h1><p>${hideBirth?'生辰已隐藏':`${b.year}.${String(b.month).padStart(2,'0')}.${String(b.day).padStart(2,'0')} · ${BRANCHES[b.hour]}时 · ${b.gender==='male'?'男':'女'}`}</p></div><button class="outline" id="edit">修改</button></section>
+    ${hideBirth?'':`<div class="lunar-line">农历 ${escape(actualLunarLabel(currentInput))}<span>${escape(c.yinYangGender || '')} · ${c.wuxingJuName}</span></div>`}
     <label class="period-control brightness-control">亮度表<select id="chart-brightness">${option('DOC','天纪盘例对照表',currentInput.brightness||'DOC')}${option('ZZ','中州原表',currentInput.brightness||'DOC')}${option('QS','斗数全书表',currentInput.brightness||'DOC')}</select></label>
     <label class="check age-display"><input id="show-ages" type="checkbox" ${showPalaceAges?'checked':''}> 宫内显示流年岁数<span class="muted">列至60岁</span></label>
     <div class="periods segmented">${[['natal','本命'],['decadal','大限'],['year','流年']].map(([value,label])=>`<button data-period="${value}" class="${period===value?'active':''}">${label}</button>`).join('')}</div>
@@ -101,22 +129,22 @@ function chartHTML() {
     ${period==='year'?`<div class="period-control"><label for="target-year">流年</label><div class="year-input-group"><input id="target-year" type="number" min="1900" max="2100" value="${targetYear}"><div class="year-stepper"><button type="button" data-year-step="-1" aria-label="上一年" ${targetYear<=1900?'disabled':''}>−</button><button type="button" data-year-step="1" aria-label="下一年" ${targetYear>=2100?'disabled':''}>＋</button></div></div><span>${STEMS[((targetYear-4)%10+10)%10]}${BRANCHES[((targetYear-4)%12+12)%12]}年</span></div><div class="year-palaces"><strong>${yearContext.smallBranch===null?'尚未出生':`${yearContext.age}虚岁 · 流年在${BRANCHES[yearContext.smallBranch]}宫／${escape(c.palaces.find(p=>p.branch===yearContext.smallBranch)!.name)}`}</strong><span>太岁：${BRANCHES[yearContext.taiBranch]}宫／${escape(c.palaces.find(p=>p.branch===yearContext.taiBranch)!.name)}</span></div>`:''}
     ${yearSummary}
     <div class="chart-scroll"><div class="chart-grid ${showPalaceAges?'with-ages':'without-ages'}" aria-label="十二宫命盘">${c.palaces.map(p=>{const [row,col]=positions[p.branch];return `<button class="palace ${p.isMingGong?'ming':''} ${selected===p.branch?'selected':''} ${related.includes(p.branch)?'related':''} ${at===p.branch?'period-active':''}" data-palace="${p.branch}" style="grid-row:${row};grid-column:${col}" aria-label="${STEMS[p.stem]}${BRANCHES[p.branch]} ${p.name}"><div class="cell-top"><span>${STEMS[p.stem]}${BRANCHES[p.branch]}</span>${p.isShenGong?'<b>身</b>':''}${at===p.branch?`<b class="period-mark">${period==='year'?(showPalaceAges?`${yearContext.age}岁`:'流年'):'大限'}</b>`:''}${period==='year'&&p.branch===yearContext.taiBranch?'<b class="taisui-mark">太岁</b>':''}</div><small class="cell-hour" aria-label="${BRANCHES[p.branch]}时">${BRANCHES[p.branch]}</small>${starsHTML(p)}<div class="cell-footer">${showPalaceAges?`<div class="cell-ages" aria-label="流年虚岁"><small>流年</small>${palaceAges(c,p.branch).filter(age=>age<=60).map(age=>`<span class="${period==='year'&&age===yearContext.age?'age-active':''}">${age}</span>`).join('')}</div>`:''}<div class="cell-bottom"><small>${p.daXianAge?`大限 ${p.daXianAge.join('–')}`:''}</small><strong>${escape(p.name)}</strong></div></div></button>`}).join('')}
-    <div class="chart-center"><b>天纪紫微</b><div class="center-date">公历 ${b.year}.${b.month}.${b.day}<br>农历 ${escape(actualLunarLabel(currentInput))}${currentInput.clock?`<br><span class="center-clock">出生 ${escape(currentInput.clock)} · ${BRANCHES[b.hour]}时</span>`:''}</div><div class="center-pillars">${context.pillars.map((p,i)=>`<div><small>${['年柱','月柱','日柱','时柱'][i]}</small><strong>${p[0]}</strong><strong>${p[1]}</strong></div>`).join('')}</div><div class="center-summary">${c.wuxingJuName} · 命${BRANCHES[c.mingGongBranch]} · 身${BRANCHES[c.shenGongBranch]}<br>命主${escape(c.mingZhu)} · 身主${escape(c.shenZhu)}</div><button class="center-gua" data-gua-current aria-label="查看先天卦和后天卦"><span class="center-gua-pair">${[{title:'先天卦',gua:minggua.before},{title:'后天卦',gua:minggua.after}].map(({title,gua})=>`<span class="center-mini-gua"><small>${title}</small><b>${hexName(gua.code)}</b>${guaDiagram(gua)}</span>`).join('')}</span><small>展开命卦与流年 ›</small></button></div></div></div>
+    <div class="chart-center"><b>天纪紫微</b>${hideBirth?'<div class="birth-hidden">生辰已隐藏</div>':`<div class="center-date">公历 ${b.year}.${b.month}.${b.day}<br>农历 ${escape(actualLunarLabel(currentInput))}${currentInput.clock?`<br><span class="center-clock">出生 ${escape(currentInput.clock)} · ${BRANCHES[b.hour]}时</span>`:''}</div><div class="center-pillars">${context.pillars.map((p,i)=>`<div><small>${['年柱','月柱','日柱','时柱'][i]}</small><strong>${p[0]}</strong><strong>${p[1]}</strong></div>`).join('')}</div>`}<div class="center-summary">${c.wuxingJuName} · 命${BRANCHES[c.mingGongBranch]} · 身${BRANCHES[c.shenGongBranch]}<br>命主${escape(c.mingZhu)} · 身主${escape(c.shenZhu)}</div>${hideCenterGua?'':`<div class="center-gua"><div class="center-gua-pair">${[{title:'先天卦',gua:minggua.before,category:'before'},{title:'后天卦',gua:minggua.after,category:'after'}].map(({title,gua,category})=>`<button type="button" class="center-mini-gua" data-open-commentary="${category}" aria-label="查看${title}条辨"><small>${title}</small><b>${hexName(gua.code)}</b>${guaDiagram(gua)}<small>查看条辨</small></button>`).join('')}</div><button class="center-gua-more" data-gua-current>完整命卦与流年 ›</button></div>`}</div></div></div>
     <div class="chart-legend"><span class="h禄">● 禄</span><span class="h权">● 权</span><span class="h科">● 科</span><span class="h忌">● 忌</span><small>点击宫位 · 看三方四正</small></div>
     <section class="card palace-detail"><div class="section-head"><h2>${escape(selectedPalace.name)}</h2><span>${STEMS[selectedPalace.stem]}${BRANCHES[selectedPalace.branch]}${selectedPalace.isShenGong?' · 身宫':''}</span></div><p class="detail-ages">流年虚岁：${palaceAges(c,selectedPalace.branch).join('、')}</p><div class="detail-stars">${selectedPalace.stars.map(s=>`<span>${escape(s.name)}${s.siHua?` <b class="h${s.siHua}">化${s.siHua}</b>`:''}${s.brightnessRaw?` <small>${s.brightnessRaw}</small>`:''}</span>`).join('')}</div><p class="muted">三方四正：${[selectedPalace.branch,(selectedPalace.branch+4)%12,(selectedPalace.branch+8)%12,(selectedPalace.branch+6)%12].map(x=>`${c.palaces.find(p=>p.branch===x)!.name}（${BRANCHES[x]}）`).join(' · ')}</p></section>
     <button class="primary wide" id="save">保存到我的命盘 <span>＋</span></button><p class="rules">排盘口径：闰月作下月论 · 辛年魁午钺寅<br>流年：男顺女逆；虚岁按农历出生年起算。<br>太岁另按年支标示，生年四化固定。<br>${showPalaceAges?'宫内流年列至60岁；60岁以后仍可选年查询。':'已隐藏宫内流年岁数；可选年查询、点击宫位查看。'}</p>`;
 }
 function historyHTML() {
-  return `<section class="page-heading"><span class="eyebrow">属于你的命盘簿</span><h1>我的命盘 <small>${records.length}</small></h1><p>保存在本机，随时打开继续查看。</p></section>${storageError?'<p class="error">本机档案读取失败，为避免覆盖，暂时不能保存新档案。</p>':''}${records.length?records.map(r=>`<article class="card record"><button class="record-open" data-record="${escape(r.id)}"><span class="record-emblem">${escape((r.input.name||'命')[0])}</span><span><b>${escape(r.input.name||'未命名命盘')}</b><small>${r.input.year}年${r.input.leap&&r.input.calendar==='lunar'?'闰':''}${r.input.month}月${r.input.day}日 · ${r.input.calendar==='lunar'?'农历':'公历'}<br>${BRANCHES[r.input.hour]}时 · ${r.input.gender==='male'?'男':'女'}</small></span><span class="record-arrow">↗</span></button><button class="delete" data-delete="${escape(r.id)}" aria-label="删除${escape(r.input.name||'命盘')}">删除</button></article>`).join(''):`<div class="card empty"><span>▤</span><h2>把重要的命盘留在这里</h2><p>起盘后点击“保存到我的命盘”，<br>下次打开即可继续查看。</p><button class="primary" data-page="form">新建命盘</button></div>`}<p class="rules">资料保存在应用内。卸载应用会删除本机档案。</p>`;
+  return `<section class="page-heading"><span class="eyebrow">属于你的命盘簿</span><h1>我的命盘 <small>${records.length}</small></h1><p>保存在本机，随时打开继续查看。</p></section>${storageError?'<p class="error">本机档案读取失败，为避免覆盖，暂时不能保存新档案。</p>':''}${records.length?records.map(r=>`<article class="card record"><button class="record-open" data-record="${escape(r.id)}"><span class="record-emblem">${escape((r.input.name||'命')[0])}</span><span><b>${escape(r.input.name||'未命名命盘')}</b><small>${hideBirth?'生辰已隐藏':`${r.input.year}年${r.input.leap&&r.input.calendar==='lunar'?'闰':''}${r.input.month}月${r.input.day}日 · ${r.input.calendar==='lunar'?'农历':'公历'}<br>${BRANCHES[r.input.hour]}时 · ${r.input.gender==='male'?'男':'女'}`}</small></span><span class="record-arrow">↗</span></button><button class="delete" data-delete="${escape(r.id)}" aria-label="删除${escape(r.input.name||'命盘')}">删除</button></article>`).join(''):`<div class="card empty"><span>▤</span><h2>把重要的命盘留在这里</h2><p>起盘后点击“保存到我的命盘”，<br>下次打开即可继续查看。</p><button class="primary" data-page="form">新建命盘</button></div>`}<p class="rules">资料保存在应用内。卸载应用会删除本机档案。</p>`;
 }
 function guaPageHTML() {
   if (!currentInput && !guaExample) return `<section class="page-heading"><span class="eyebrow">四柱 · 先天 · 后天</span><h1>四柱命卦</h1><p>从生辰排先后天卦，查看流年、流月与流日。</p></section><div class="card empty"><span>☰</span><h2>先填写出生信息</h2><p>或查看书中的风水涣例案：<br>一岁元堂九二，后天为地风升。</p><button class="primary" data-page="form">填写生辰</button><button class="text-button wide" data-gua-source="book">查看书中例案</button></div>`;
   try {
-    if (guaExample) return mingguaHTML(textbookExample(),guaAge,true,'',guaDate,guaClock,guaDayError,guaCalendar,guaLeap);
+    if (guaExample) return mingguaHTML(textbookExample(),guaAge,true,'',guaDate,guaClock,guaDayError,guaCalendar,guaLeap,hideBirth);
     const context=pillarContext(currentInput!);
     const data=fromPillars(context.pillars,currentInput!.gender,context.birthYear,currentInput!.hour,context.yangSeason);
     const note=`立春换年、节令换月；卦年序归${context.birthYear}（${context.pillars[0]}）年起一岁。${context.estimatedTime?'按时辰中点 '+context.clock+' 估算，交节附近请补准确时分。':'出生时间 '+context.clock+'（北京时间）。'}早晚子时日柱同日，晚子时时柱用次日日干。`;
-    return mingguaHTML(data,guaAge,false,note,guaDate,guaClock,guaDayError,guaCalendar,guaLeap);
+    return mingguaHTML(data,guaAge,false,note,guaDate,guaClock,guaDayError,guaCalendar,guaLeap,hideBirth);
   } catch(error) {return `<p class="error">${escape((error as Error).message)}</p><button class="outline" data-page="form">核对出生信息</button>`;}
 }
 function activeMinggua() {
@@ -146,7 +174,24 @@ function store(next:RecordEntry[]) {
   try {localStorage.setItem(storageKey,JSON.stringify(next)); records=next; return true;} catch {toast('保存失败，设备存储空间可能不足'); return false;}
 }
 function render() {
-  root.innerHTML=`<header class="topbar"><span class="brand"><i>✦</i> 天纪紫微</span><span class="offline"><i></i> 离线排盘</span></header><main>${page==='form'?formHTML():page==='chart'?chartHTML():page==='gua'?guaPageHTML():historyHTML()}</main><nav class="bottom-nav" aria-label="主导航">${(['form','chart','gua','history'] as Page[]).map(p=>`<button data-page="${p}" class="${page===p?'active':''}" ${page===p?'aria-current="page"':''}><span>${icon(p)}</span>${{form:'起盘',chart:'命盘',gua:'命卦',history:'档案'}[p]}</button>`).join('')}</nav>`;
+  root.innerHTML=`<header class="topbar"><span class="brand"><i>✦</i> 天纪紫微</span><span class="offline"><i></i> 离线排盘</span></header><main>${page==='form'?'':displaySettingsHTML()}${page==='form'?formHTML():page==='chart'?chartHTML():page==='gua'?guaPageHTML():historyHTML()}${page==='form'?displaySettingsHTML():''}</main><nav class="bottom-nav" aria-label="主导航">${(['form','chart','gua','history'] as Page[]).map(p=>`<button data-page="${p}" class="${page===p?'active':''}" ${page===p?'aria-current="page"':''}><span>${icon(p)}</span>${{form:'起盘',chart:'命盘',gua:'命卦',history:'档案'}[p]}</button>`).join('')}</nav>`;
+  root.querySelector<HTMLSelectElement>('#theme-mode')?.addEventListener('change',e=>{
+    themeMode=(e.target as HTMLSelectElement).value as ThemeMode;
+    try{localStorage.setItem('tianji-color-mode-v1',themeMode);}catch{toast('外观设置未能保存，本次切换仍有效');}
+    applyTheme();
+  });
+  root.querySelector<HTMLInputElement>('#hide-birth')?.addEventListener('change',e=>{
+    if(page==='form')draft=readForm();
+    hideBirth=(e.target as HTMLInputElement).checked;
+    try{localStorage.setItem('tianji-hide-birth-v1',String(hideBirth));}catch{toast('显示设置未能保存，本次切换仍有效');}
+    render();
+  });
+  root.querySelector<HTMLInputElement>('#hide-gua')?.addEventListener('change',e=>{
+    if(page==='form')draft=readForm();
+    hideCenterGua=(e.target as HTMLInputElement).checked;
+    try{localStorage.setItem('tianji-hide-gua-v1',String(hideCenterGua));}catch{toast('显示设置未能保存，本次切换仍有效');}
+    render();
+  });
   root.querySelectorAll<HTMLButtonElement>('[data-page]').forEach(el=>el.onclick=()=>changePage(el.dataset.page as Page));
   root.querySelectorAll<HTMLButtonElement>('[data-gua-source]').forEach(el=>el.onclick=()=>{guaExample=el.dataset.guaSource==='book';guaAge=1;guaDate='';guaDayError='';changePage('gua');});
   root.querySelector<HTMLSelectElement>('#gua-age')?.addEventListener('change',e=>{guaAge=Number((e.target as HTMLSelectElement).value);guaDate='';guaDayError='';render();});
@@ -169,6 +214,12 @@ function render() {
   });
   root.querySelectorAll<HTMLButtonElement>('[data-gua-month]').forEach(el=>el.onclick=()=>{
     try{const m=activeMinggua(),moment=solarMonthStart(m.birthYear+guaAge-1,Number(el.dataset.guaMonth)),dates=dailyCalendarDates(moment.slice(0,10));guaDate=guaCalendar==='lunar'?dates.lunar:dates.solar;guaLeap=dates.leap;guaClock=moment.slice(11);guaDayError='';render();root.querySelector('#daily-gua')?.scrollIntoView({block:'start'});}catch(error){toast((error as Error).message);}
+  });
+  root.querySelectorAll<HTMLButtonElement>('[data-open-commentary]').forEach(el=>el.onclick=()=>{
+    guaExample=false;guaAge=1;guaDate='';guaDayError='';const category=el.dataset.openCommentary as 'before'|'after';
+    const data=activeMinggua(),code=data[category].code;changePage('gua');
+    const details=root.querySelector<HTMLDetailsElement>(`#commentary-${category}-${code}`);
+    if(details){details.open=true;details.scrollIntoView({block:'start'});}
   });
   root.querySelector<HTMLInputElement>('#show-ages')?.addEventListener('change',e=>{showPalaceAges=(e.target as HTMLInputElement).checked;try{localStorage.setItem('tianji-show-ages-v1',String(showPalaceAges));}catch{toast('显示设置未能保存，本次切换仍有效');}render();});
   root.querySelector<HTMLSelectElement>('#chart-brightness')?.addEventListener('change',e=>{if(!currentInput)return;const input={...currentInput,brightness:(e.target as HTMLSelectElement).value as BirthInput['brightness']};chart=makeChart(input);currentInput=input;draft={...input};render();});
