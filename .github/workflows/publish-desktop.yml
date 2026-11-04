@@ -1,0 +1,58 @@
+name: Publish verified desktop packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_run_id:
+        description: Successful Desktop release workflow run
+        required: true
+        type: string
+      release_id:
+        description: Existing unpublished release ID
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      BUILD_RUN_ID: ${{ inputs.build_run_id }}
+      RELEASE_ID: ${{ inputs.release_id }}
+    steps:
+      - name: Validate build provenance and unpublished release
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$BUILD_RUN_ID" =~ ^[1-9][0-9]{0,19}$ ]]
+          [[ "$RELEASE_ID" =~ ^[1-9][0-9]{0,19}$ ]]
+          gh api "repos/$GH_REPO/actions/runs/$BUILD_RUN_ID" > build.json
+          gh api "repos/$GH_REPO/releases/$RELEASE_ID" > release.json
+          jq -e '.conclusion == "success" and .path == ".github/workflows/desktop-release.yml" and .head_repository.full_name == env.GH_REPO' build.json
+          jq -e '.draft == true' release.json
+          test "$(jq -r .head_sha build.json)" = "$(jq -r .target_commitish release.json)"
+          gh api "repos/$GH_REPO/actions/runs/$BUILD_RUN_ID/artifacts" > artifacts.json
+          jq -e '([.artifacts[].name] | sort) == ["desktop-mac-arm64", "desktop-mac-x64", "desktop-win-x64"] and all(.artifacts[]; .expired == false)' artifacts.json
+      - uses: actions/download-artifact@v8.0.2
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.build_run_id }}
+          pattern: desktop-*
+          path: packages
+          merge-multiple: true
+      - name: Upload the verified packages to the draft
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(packages/tianji-ziwei-*-win-x64.exe packages/tianji-ziwei-*-mac-x64.zip packages/tianji-ziwei-*-mac-arm64.zip)
+          test "${#files[@]}" -eq 3
+          for file in "${files[@]}"; do test -f "$file"; done
+          tag="$(jq -r .tag_name release.json)"
+          gh release upload "$tag" "${files[@]}" --clobber
+          sha256sum "${files[@]}"
