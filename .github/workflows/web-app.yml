@@ -7,6 +7,7 @@ on:
     paths:
       - 'pwa/**'
       - 'ziwei-android/web/**'
+      - 'ziwei-android/third-party/**'
       - 'ziwei-android/build-web.cjs'
       - 'ziwei-doushu/lib/**'
       - 'ziwei-doushu/package*.json'

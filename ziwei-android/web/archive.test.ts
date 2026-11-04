@@ -30,4 +30,9 @@ for(const group of [null,42,'组'.repeat(31)]) {
 assert.throws(()=>upsertRecord(records,input,'组'.repeat(31),200,'new'),/30/);
 assert.throws(()=>readRecords('{broken'));
 assert.throws(()=>readRecords(JSON.stringify([{...legacy,saved:null}])));
+const located={...input,trueSolar:true,region:'custom',longitude:87.6168,clock:'01:30',hour:1,clockBasis:'beijing' as const};
+const locatedRecords=upsertRecord(records,located,'地点测试',600,'located');
+assert.deepEqual(readRecords(JSON.stringify(locatedRecords)),locatedRecords,'保留原始钟表时间、经度与时制，重开不能重复校正');
+assert.deepEqual(locatedRecords[1],legacy,'新增真太阳档案不迁移或改写旧档案');
+assert.throws(()=>readRecords(JSON.stringify([{...legacy,input:{...located,longitude:null}}])),/经度/,'损坏的新字段阻止覆盖已有档案');
 console.log('档案分组测试通过：旧档案兼容、重复保存、分组往返、未分组、异常保护');

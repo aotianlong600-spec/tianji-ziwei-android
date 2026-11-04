@@ -37,3 +37,8 @@ assert.equal(yao('QS'),'旺');
 assert.equal(pillarContext({...base,hour:1,clock:'02:30'}).birthYear,2003);
 assert.equal(pillarContext({...base,hour:11,clock:'21:30'}).birthYear,2004);
 console.log('先后天卦与立春归年、同日交节前后年序核对通过');
+const oldContext=pillarContext({...base,hour:1,clock:'02:30'});
+assert.equal(oldContext.hour,1);
+assert.deepEqual(pillarContext({...base,hour:1,clock:'02:30',trueSolar:false,longitude:75,clockBasis:'xinjiang'}),oldContext,'旧档案及未启用真太阳时时保持原有北京时间结果');
+assert.equal(oldContext.clock,'02:30');
+assert.equal(oldContext.conversion,undefined);
