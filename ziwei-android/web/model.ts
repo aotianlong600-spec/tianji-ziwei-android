@@ -2,11 +2,12 @@ import type { BirthInfo } from '../../ziwei-doushu/lib/ziwei/types';
 import { generateChart, setBrightnessSchool } from '../../ziwei-doushu/lib/ziwei/algorithm';
 import { lunarToSolar } from '../../ziwei-doushu/lib/ziwei/lunar-solar';
 import { Solar } from 'lunar-javascript';
-import { convertSolarTime, type ClockBasis, type SolarTimeConversion } from './solar-time';
-export interface BirthInput { name: string; year: number; month: number; day: number; hour: number; gender: 'male' | 'female'; calendar: 'solar' | 'lunar'; leap: boolean; clock?: string; brightness?: 'DOC' | 'ZZ' | 'QS'; trueSolar?: boolean; region?: string; longitude?: number; clockBasis?: ClockBasis; }
+import { convertSolarTime, type ClockBasis, type SolarTimeConversion, type TimeDisambiguation } from './solar-time';
+export interface BirthInput { name: string; year: number; month: number; day: number; hour: number; gender: 'male' | 'female'; calendar: 'solar' | 'lunar'; leap: boolean; clock?: string; brightness?: 'DOC' | 'ZZ' | 'QS'; trueSolar?: boolean; region?: string; longitude?: number; clockBasis?: ClockBasis; timeZone?: string; timeDisambiguation?: TimeDisambiguation; }
 function resolveBirth(input: BirthInput): { birth:BirthInfo; solar?:Date; beijing?:Date; conversion?:SolarTimeConversion } {
   if (input.trueSolar!==undefined && typeof input.trueSolar!=='boolean') throw new Error('真太阳时选项须为开启或关闭');
   const { year, month, day, hour, gender, calendar } = input;
+  if (input.region!==undefined && typeof input.region!=='string') throw new Error('出生地区格式异常');
   if (![year, month, day, hour].every(Number.isInteger)) throw new Error('请填写完整的出生日期与时辰');
   if (year < 1900 || year > new Date().getFullYear()) throw new Error('出生年份须在 1900 年至今年之间');
   if (!['male','female'].includes(gender)) throw new Error('请选择性别');
@@ -29,7 +30,10 @@ function resolveBirth(input: BirthInput): { birth:BirthInfo; solar?:Date; beijin
   }
   const birth={ name: input.name.trim().slice(0,30), ...date, hour, gender };
   if (!input.trueSolar) return {birth};
-  const result=convertSolarTime(date,input.clock,input.longitude,input.clockBasis);
+  const worldRegion=input.region?.startsWith('geonames:') || input.region?.startsWith('country:');
+  const overseasLongitude=typeof input.longitude==='number' && Number.isFinite(input.longitude) && (input.longitude<73 || input.longitude>136);
+  if (!input.timeZone && (worldRegion || overseasLongitude)) throw new Error('海外出生地或境外经度须填写出生地 IANA 时区，以正确确定出生日期');
+  const result=convertSolarTime(date,input.clock,input.longitude,input.clockBasis,input.timeZone,input.timeDisambiguation);
   const solar=result.solar;
   const corrected={year:solar.getUTCFullYear(),month:solar.getUTCMonth()+1,day:solar.getUTCDate()};
   if (corrected.year<1900 || corrected.year>2050) throw new Error('真太阳时修正后的日期超出支持范围（1900–2050 年）');

@@ -42,3 +42,14 @@ assert.equal(oldContext.hour,1);
 assert.deepEqual(pillarContext({...base,hour:1,clock:'02:30',trueSolar:false,longitude:75,clockBasis:'xinjiang'}),oldContext,'旧档案及未启用真太阳时时保持原有北京时间结果');
 assert.equal(oldContext.clock,'02:30');
 assert.equal(oldContext.conversion,undefined);
+assert.deepEqual(pillarContext({...base,hour:1,clock:'02:30',trueSolar:false,clockBasis:'local',timeZone:'Invalid/Zone'}),oldContext,'关闭真太阳时保留旧档案结果，不解析无关时区');
+const overseas={...base,year:2020,month:1,day:2,hour:3,clock:'06:00',trueSolar:true,clockBasis:'beijing' as const,longitude:-171.75,region:'geonames:4035413'};
+for (const input of [
+  overseas,{...overseas,region:'country:WS',longitude:120},
+  {...overseas,region:'geonames:4035413',longitude:120},
+  {...overseas,region:'custom',longitude:-74},{...overseas,region:undefined,longitude:137},
+  {...overseas,timeZone:''},
+]) assert.throws(()=>toBirthInfo(input),/IANA|时区/,'海外出生记录即使已转北京时间，也须保留出生地时区');
+assert.doesNotThrow(()=>toBirthInfo({...overseas,timeZone:'Pacific/Apia'}));
+for (const longitude of [73,87.6168,136]) assert.doesNotThrow(()=>toBirthInfo({...overseas,region:'custom',longitude}),'旧国内自定经度手动时制允许无时区');
+assert.doesNotThrow(()=>toBirthInfo({...overseas,trueSolar:false}),'未启用真太阳时不要求无关的出生地时区');

@@ -7,6 +7,7 @@ import { yearPalaces, palaceAges } from './year-palace';
 import { readRecords, recordGroups, upsertRecord, normalizeGroup, type RecordEntry } from './archive';
 import { mountPalaceConnections } from './palace-connections';
 import { BIRTH_REGIONS } from './birth-regions';
+import { WORLD_COUNTRIES, WORLD_REGIONS } from './world-regions';
 import { BRANCHES, STEMS } from '../../ziwei-doushu/lib/ziwei/constants';
 import type { ZiweiChart, Palace } from '../../ziwei-doushu/lib/ziwei/types';
 
@@ -80,6 +81,7 @@ let records: RecordEntry[] = [];
 let saveGroup='', historyGroup:string|null=null;
 let clearConnections=()=>{};
 let renderedGuaState='';
+let worldCitySearch='';
 try {
   records=readRecords(localStorage.getItem(storageKey));
 } catch { storageError=true; }
@@ -99,27 +101,50 @@ function changePage(next:Page) {
 }
 function option(value:unknown,label:string,current:unknown) { return `<option value="${escape(value)}" ${value===current?'selected':''}>${escape(label)}</option>`; }
 function numeric(value:number) { return Number.isFinite(value)?value:''; }
-const clockBasisNames={beijing:'北京时间 UTC+8',daylight:'夏令时 UTC+9',xinjiang:'新疆时 UTC+6'};
+const clockBasisNames={beijing:'北京时间 UTC+8',daylight:'夏令时 UTC+9',xinjiang:'新疆时 UTC+6',local:'当地法定时间（自动）'};
+let countryNames:Intl.DisplayNames|undefined;
+try {if(typeof Intl.DisplayNames==='function')countryNames=new Intl.DisplayNames(['zh-CN'],{type:'region'});} catch {}
+const worldCountries=WORLD_COUNTRIES.map(country=>({...country,name:countryNames?.of(country.code)||country.name})).sort((a,b)=>a.name.localeCompare(b.name,'zh-CN'));
+const countryName=(code:string)=>worldCountries.find(country=>country.code===code)?.name||'自定地区';
+const longitudeName=(value:number)=>`${value<0?'西经':'东经'} ${Math.abs(value).toFixed(4)}°`;
+const domesticTimeZone=(province:string)=>province==='台湾省'?'Asia/Taipei':province==='香港特别行政区'?'Asia/Hong_Kong':province==='澳门特别行政区'?'Asia/Macau':'Asia/Shanghai';
+function utcLabel(minutes:number) {
+  const seconds=Math.round(Math.abs(minutes)*60),hours=Math.floor(seconds/3600),rest=Math.floor(seconds%3600/60);
+  return `UTC${minutes>=0?'+':'−'}${String(hours).padStart(2,'0')}:${String(rest).padStart(2,'0')}${seconds%60?':'+String(seconds%60).padStart(2,'0'):''}`;
+}
 function birthPlaceName(input:BirthInput) {
   const place=BIRTH_REGIONS.find(r=>r.id===input.region);
-  return place?`${place.province} · ${place.city}`:'自定出生地';
+  const world=WORLD_REGIONS.find(r=>r.id===input.region);
+  return place?`${place.province} · ${place.city}`:world?`${countryName(world.country)} · ${world.city}`:input.region?.startsWith('country:')?`${countryName(input.region.slice(8))} · 自定出生地`:'自定出生地';
 }
 function solarPreviewHTML(input:BirthInput) {
   if(!input.trueSolar)return '';
   try {
     const context=pillarContext(input),time=context.conversion!;
     const minutes=(n:number)=>`${n>=0?'+':''}${n.toFixed(2)}分`;
-    return `<strong>真太阳时约 ${escape(time.solarMoment)} · ${BRANCHES[context.hour]}时</strong><span>原钟表 ${escape(time.originalMoment)}<br>${escape(birthPlaceName(input))} · 东经 ${time.longitude.toFixed(4)}°<br>经度差 ${minutes(time.longitudeMinutes)} · 均时差 ${minutes(time.equationMinutes)}<br>合计较原钟表 ${minutes(time.totalMinutes)}${time.dayShift?` · ${time.dayShift<0?'退':'进'}${Math.abs(time.dayShift)}日`:''}</span>`;
+    return `<strong>真太阳时约 ${escape(time.solarMoment)} · ${BRANCHES[context.hour]}时</strong><span>原钟表 ${escape(time.originalMoment)}<br>${escape(birthPlaceName(input))} · ${longitudeName(time.longitude)}<br>${time.birthplaceTimeZone?`出生地时区 ${escape(time.birthplaceTimeZone)} · ${utcLabel(time.placeOffsetMinutes!)}<br>`:''}经度与时区修正 ${minutes(time.totalMinutes-time.equationMinutes)} · 均时差 ${minutes(time.equationMinutes)}<br>合计较原钟表 ${minutes(time.totalMinutes)}${time.dayShift?` · ${time.dayShift<0?'退':'进'}${Math.abs(time.dayShift)}日`:''}</span>`;
   } catch(error) {return `<span>${escape((error as Error).message)}</span>`;}
 }
+function worldCityOptions(country:string,selected:string,search:string) {
+  const normalized=(value:string)=>value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase();
+  const query=normalized(search.trim());
+  const choices=WORLD_REGIONS.filter(r=>r.country===country&&normalized(r.city).includes(query)).slice(0,80);
+  const chosen=WORLD_REGIONS.find(r=>r.id===selected&&r.country===country);
+  if(chosen&&!choices.includes(chosen))choices.unshift(chosen);
+  return option('','请选择城市',selected)+choices.map(r=>option(r.id,r.city,selected)).join('');
+}
 function birthLocationHTML() {
-  const place=BIRTH_REGIONS.find(r=>r.id===draft.region),province=place?.province||(draft.region==='custom'?'@custom':'');
+  const place=BIRTH_REGIONS.find(r=>r.id===draft.region),world=WORLD_REGIONS.find(r=>r.id===draft.region);
+  const scope=world||draft.region?.startsWith('country:')?'world':draft.region==='custom'?'custom':'domestic';
+  const province=place?.province||'',country=world?.country||(scope==='world'?draft.region?.slice(8)||'':'');
+  const timeZone=draft.timeZone||world?.timeZone||(place&&draft.clockBasis==='local'?domesticTimeZone(place.province):'');
   const provinces=[...new Set(BIRTH_REGIONS.map(r=>r.province))];
-  return `<section class="birth-location"><label class="check"><input type="checkbox" name="true-solar" ${draft.trueSolar?'checked':''}>按出生地真太阳时排盘</label><div class="solar-options" ${draft.trueSolar?'':'hidden'}><div class="two-fields"><label class="field">出生省份<select name="province">${option('','请选择省份',province)}${provinces.map(p=>option(p,p,province)).join('')}${option('@custom','自定经度',province)}</select></label><label class="field">出生城市<select name="region" ${province==='@custom'?'disabled':''}>${option('','请选择城市',draft.region||'')}${BIRTH_REGIONS.filter(r=>r.province===province).map(r=>option(r.id,r.city,draft.region)).join('')}</select></label></div><div class="two-fields"><label class="field">出生地东经 <span class="optional">可微调</span><input name="longitude" type="number" inputmode="decimal" min="73" max="136" step="0.0001" placeholder="例如 116.4074" value="${numeric(draft.longitude??NaN)}"></label><label class="field">原钟表时间口径<select name="clock-basis">${Object.entries(clockBasisNames).map(([value,label])=>option(value,label,draft.clockBasis||'beijing')).join('')}</select></label></div><p class="field-note">省市坐标为近似代表点；出生地较偏远或接近时辰交界时，请核准实际经度。大陆1986–1991年及港澳台历史上有夏令时，须按出生记录选择时制；已还原北京时间的记录请选UTC+8。新疆出生不等于记录采用UTC+6，不会自动切换；其他历史时制请先还原为标准北京时间。</p><div id="solar-preview" class="solar-preview" role="status" aria-live="polite">${solarPreviewHTML(draft)}</div></div></section>`;
+  const fields=scope==='domestic'?`<div class="two-fields"><label class="field">出生省份<select name="province">${option('','请选择省份',province)}${provinces.map(p=>option(p,p,province)).join('')}</select></label><label class="field">出生城市<select name="region">${option('','请选择城市',draft.region||'')}${BIRTH_REGIONS.filter(r=>r.province===province).map(r=>option(r.id,r.city,draft.region)).join('')}</select></label></div>`:scope==='world'?`<label class="field">国家／地区<select name="country">${option('','请选择国家／地区',country)}${worldCountries.map(c=>option(c.code,c.name,country)).join('')}</select></label><label class="field">搜索城市 <span class="optional">输入英文名或列表中的名称</span><input name="city-search" type="search" placeholder="例如 New York、London、Tokyo" value="${escape(worldCitySearch)}" autocomplete="off"></label><label class="field">出生城市<select name="region">${worldCityOptions(country,draft.region||'',worldCitySearch)}</select></label><p class="field-note">每次显示前80个匹配城市；未列地点可直接填写实际经度和IANA时区。城市为近似代表点。</p>`:'';
+  return `<section class="birth-location"><label class="check"><input type="checkbox" name="true-solar" ${draft.trueSolar?'checked':''}>按出生地真太阳时排盘</label><div class="solar-options" ${draft.trueSolar?'':'hidden'}><label class="field">出生地区<select name="birth-scope">${option('domestic','国内省市（默认）',scope)}${option('world','海外国家／城市',scope)}${option('custom','自定经度与时区',scope)}</select></label>${fields}<div class="two-fields"><label class="field">经度 <span class="optional">东正西负 · 可微调</span><input name="longitude" type="${scope==='domestic'?'number':'text'}" inputmode="${scope==='domestic'?'decimal':'text'}" min="-180" max="180" step="0.0001" placeholder="例如 116.4074 或 -74.006" value="${numeric(draft.longitude??NaN)}"></label><label class="field">原钟表时间口径<select name="clock-basis">${Object.entries(clockBasisNames).map(([value,label])=>option(value,label,draft.clockBasis||'beijing')).join('')}</select></label></div><div class="local-time-options" ${draft.clockBasis==='local'||scope!=='domestic'?'':'hidden'}><label class="field">出生地IANA时区 <span class="optional">选城市自动填写，可核准</span><input name="time-zone" value="${escape(timeZone)}" placeholder="例如 America/New_York" autocomplete="off" autocapitalize="none" spellcheck="false"></label><label class="field" style="${draft.clockBasis==='local'?'':'display:none'}">夏令回拨重复时间<select name="time-disambiguation">${option('','通常无需选择；重复时请确认',draft.timeDisambiguation||'')}${option('earlier','第一次出现（回拨前）',draft.timeDisambiguation)}${option('later','第二次出现（回拨后）',draft.timeDisambiguation)}</select></label></div><p class="field-note">国内默认标准北京时间；海外选城市后按当地法定时间自动处理时区和夏令时。若记录已换成北京时间，请改选UTC+8并保留出生地时区；新疆出生不等于记录采用UTC+6。时区历史规则取自本机系统，老旧系统资料可能不同；交界时刻请核准生时及经度。</p><div id="solar-preview" class="solar-preview" role="status" aria-live="polite">${solarPreviewHTML(draft)}</div></div></section>`;
 }
 function birthTimeNote(input:BirthInput,context:ReturnType<typeof pillarContext>) {
   const time=context.conversion;
-  if(time)return `${birthPlaceName(input)}，东经${time.longitude.toFixed(4)}°；原记录 ${time.originalMoment}（${clockBasisNames[time.clockBasis]}），换算真太阳时约 ${time.solarMoment}（${BRANCHES[context.hour]}时）。紫微生日及四柱日、时按真太阳日期与时辰；年、月柱和冬夏令按实际北京时间 ${time.beijingMoment} 判断交节。`;
+  if(time)return `${birthPlaceName(input)}，${longitudeName(time.longitude)}${time.birthplaceTimeZone?'，出生地时区 '+time.birthplaceTimeZone+' '+utcLabel(time.placeOffsetMinutes!):''}；原记录 ${time.originalMoment}（${time.timeZone?time.timeZone+' · '+utcLabel(time.utcOffsetMinutes):clockBasisNames[time.clockBasis]}），换算真太阳时约 ${time.solarMoment}（${BRANCHES[context.hour]}时）。紫微生日及四柱日、时按真太阳日期与时辰；年、月柱和冬夏令按实际北京时间 ${time.beijingMoment} 判断交节。`;
   return context.estimatedTime?'按时辰中点 '+context.clock+' 估算，交节附近请补准确时分。':'出生时间 '+context.clock+'（标准北京时间）。';
 }
 function webAppInstallHTML() {
@@ -243,7 +268,8 @@ function readForm(): BirthInput {
   const form=root.querySelector<HTMLFormElement>('#birth-form')!;
   const data=new FormData(form);
   const clock=String(data.get('clock')||''),clockHour=Number(clock.slice(0,2)),hour=clock?Math.floor((clockHour+1)/2)%12:Number(data.get('hour'));
-  const location={trueSolar:data.get('true-solar')==='on',region:data.get('province')==='@custom'?'custom':String(data.get('region')||''),longitude:data.get('longitude')?Number(data.get('longitude')):undefined,clockBasis:String(data.get('clock-basis')||'beijing') as BirthInput['clockBasis']};
+  const scope=data.get('birth-scope'),region=scope==='custom'?'custom':String(data.get('region')||'')||(scope==='world'?`country:${data.get('country')||''}`:'');
+  const location={trueSolar:data.get('true-solar')==='on',region,longitude:data.get('longitude')?Number(data.get('longitude')):undefined,clockBasis:String(data.get('clock-basis')||'beijing') as BirthInput['clockBasis'],timeZone:String(data.get('time-zone')||'').trim()||undefined,timeDisambiguation:(String(data.get('time-disambiguation')||'')||undefined) as BirthInput['timeDisambiguation']};
   return {name:String(data.get('name')||''),year:Number(data.get('year')||NaN),month:Number(data.get('month')||NaN),day:Number(data.get('day')||NaN),hour,gender:data.get('gender') as BirthInput['gender'],calendar:draft.calendar,leap:data.get('leap')==='on',clock,brightness:data.get('brightness') as BirthInput['brightness'],...location};
 }
 function openInput(input:BirthInput,group='') {
@@ -252,7 +278,7 @@ function openInput(input:BirthInput,group='') {
     renderedGuaState='';
     chartAnnualOpen=false;unavailableGuaYear=null;
     saveGroup=records.find(r=>JSON.stringify(r.input)===JSON.stringify(input))?.group??group;
-    draft={...input}; currentInput={...input}; chart=next; selected=null; period='natal'; guaExample=false; guaAge=1;guaDate='';guaDayError=''; periodIndex=Math.max(0,next.currentDaXianIndex); changePage('chart');
+    worldCitySearch='';draft={...input}; currentInput={...input}; chart=next; selected=null; period='natal'; guaExample=false; guaAge=1;guaDate='';guaDayError=''; periodIndex=Math.max(0,next.currentDaXianIndex); changePage('chart');
   } catch(e) { toast(e instanceof Error?e.message:'起盘失败，请核对出生信息'); }
 }
 function store(next:RecordEntry[]) {
@@ -330,14 +356,35 @@ function render() {
   });
   root.querySelectorAll<HTMLButtonElement>('[data-calendar]').forEach(el=>el.onclick=()=>{draft={...readForm(),calendar:el.dataset.calendar as BirthInput['calendar'],leap:false};render();});
   root.querySelector<HTMLInputElement>('[name="true-solar"]')?.addEventListener('change',()=>{draft=readForm();render();});
+  root.querySelector<HTMLSelectElement>('[name="birth-scope"]')?.addEventListener('change',e=>{
+    draft=readForm();const scope=(e.target as HTMLSelectElement).value;worldCitySearch='';draft.timeDisambiguation=undefined;
+    if(scope==='custom')draft.region='custom';
+    else {draft.region=scope==='world'?'country:':undefined;draft.longitude=undefined;draft.clockBasis=scope==='world'?'local':'beijing';draft.timeZone=scope==='world'?'':'Asia/Shanghai';}
+    render();
+  });
   root.querySelector<HTMLSelectElement>('[name="province"]')?.addEventListener('change',e=>{
     draft=readForm();const province=(e.target as HTMLSelectElement).value,place=BIRTH_REGIONS.find(r=>r.province===province);
-    draft.region=province==='@custom'?'custom':place?.id;draft.longitude=place?.longitude;render();
+    draft.region=place?.id;draft.longitude=place?.longitude;draft.timeZone=draft.clockBasis==='local'?domesticTimeZone(province):undefined;draft.timeDisambiguation=undefined;render();
+  });
+  root.querySelector<HTMLSelectElement>('[name="country"]')?.addEventListener('change',e=>{
+    draft=readForm();draft.region=`country:${(e.target as HTMLSelectElement).value}`;draft.longitude=undefined;draft.timeZone='';draft.clockBasis='local';draft.timeDisambiguation=undefined;worldCitySearch='';render();
   });
   root.querySelector<HTMLSelectElement>('[name="region"]')?.addEventListener('change',e=>{
-    draft=readForm();draft.longitude=BIRTH_REGIONS.find(r=>r.id===(e.target as HTMLSelectElement).value)?.longitude;render();
+    draft=readForm();const id=(e.target as HTMLSelectElement).value,world=WORLD_REGIONS.find(r=>r.id===id);
+    draft.longitude=world?.longitude??BIRTH_REGIONS.find(r=>r.id===id)?.longitude;
+    if(world){draft.timeZone=world.timeZone;draft.clockBasis='local';}draft.timeDisambiguation=undefined;render();
+  });
+  root.querySelector<HTMLSelectElement>('[name="clock-basis"]')?.addEventListener('change',()=>{
+    draft=readForm();
+    if(draft.clockBasis==='local'&&!draft.timeZone){const place=BIRTH_REGIONS.find(r=>r.id===draft.region);draft.timeZone=WORLD_REGIONS.find(r=>r.id===draft.region)?.timeZone||(place?domesticTimeZone(place.province):'');}
+    render();
   });
   root.querySelector<HTMLFormElement>('#birth-form')?.addEventListener('input',e=>{
+    if((e.target as HTMLElement).getAttribute('name')==='city-search') {
+      worldCitySearch=(e.target as HTMLInputElement).value;
+      const country=root.querySelector<HTMLSelectElement>('[name="country"]')!.value,select=root.querySelector<HTMLSelectElement>('[name="region"]')!;
+      select.innerHTML=worldCityOptions(country,select.value,worldCitySearch);return;
+    }
     if((e.target as HTMLElement).getAttribute('name')==='hour')root.querySelector<HTMLInputElement>('[name="clock"]')!.value='';
     const input=readForm(),hour=root.querySelector<HTMLSelectElement>('[name="hour"]');if(input.clock&&hour)hour.value=String(input.hour);
     const preview=root.querySelector<HTMLElement>('#solar-preview');if(preview)preview.innerHTML=solarPreviewHTML(input);

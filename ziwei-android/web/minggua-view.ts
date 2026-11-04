@@ -30,7 +30,7 @@ export function mingguaHTML(data:Minggua,age:number,example:boolean,timeNote:str
   const beforeEnd=data.periods.filter(p=>p.phase==='先天').slice(-1)[0].endAge;
   return `<section class="page-heading"><span class="eyebrow">四柱为始 · 天地相荡</span><h1>先后天命卦</h1><p>先天、后天与逐年、逐月、逐日的卦象变化。</p></section>
     <div class="segmented gua-source"><button data-gua-source="birth" class="${example?'':'active'}">当前生辰</button><button data-gua-source="book" class="${example?'active':''}">书中例案</button></div>
-    ${hideBirth?'<p class="gua-time-note">生辰与四柱已隐藏。</p>':example?'<div class="gua-notice">书中例案：阳男、卯时。一岁元堂在九二。<br>此例按四柱干支演示，甲午年以1954作年序锚点，不代表公历生日。</div>':`<p class="gua-time-note">${timeNote}</p>`}
+    ${hideBirth?'<p class="gua-time-note">生辰与四柱已隐藏。</p>':example?'<div class="gua-notice">书中例案：阳男、卯时。一岁元堂在九二。<br>此例按四柱干支演示，甲午年以1954作年序锚点，不代表公历生日。</div>':`<p class="gua-time-note">${escaped(timeNote)}</p>`}
     ${hideBirth?'':`<div class="card pillar-card">${data.pillars.map((p,i)=>`<div><small>${['年柱','月柱','日柱','时柱'][i]}</small><b>${p[0]}</b><b>${p[1]}</b></div>`).join('')}</div>`}
 
     <div class="gua-pair">${[{title:'先天卦',g:data.before,years:`1–${beforeEnd}岁`,phase:'先天'},{title:'后天卦',g:data.after,years:`${beforeEnd+1}–${data.periods.slice(-1)[0].endAge}岁`,phase:'后天'}].map(({title,g,years,phase})=>`<section class="card gua-card"><div class="eyebrow">${title}</div><h2>${hexName(g.code)}</h2>${guaDiagram(g,data.periods.filter(p=>p.phase===phase))}<p>元堂 ${lineName(g.code,g.line)}</p><small>${years}</small>${commentaryHTML(g.code,phase==='先天'?'before':'after')}</section>`).join('')}</div>
