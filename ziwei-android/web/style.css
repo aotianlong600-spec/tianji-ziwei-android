@@ -45,3 +45,61 @@
 :root[data-theme="dark"] .chart-grid{--center-paper:#1e1b22}
 
 .group-picker{margin:14px 0;min-width:0}.group-picker>label,.archive-filter{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted)}.group-picker select,.archive-filter select{flex:1;min-width:0;height:40px;font-size:13px}.new-group-fields{display:flex;gap:8px;margin-top:9px}.new-group-fields[hidden]{display:none}.new-group-fields input{flex:1;min-width:0;height:40px;font-size:13px}.new-group-fields button{flex-shrink:0;min-height:40px}.archive-filter{margin-bottom:18px}.record-info{min-width:0;overflow-wrap:anywhere}.record-actions{display:flex;align-items:flex-end;gap:10px;margin-top:14px}.record-actions .group-picker{flex:1;margin:0}.record-actions .delete{position:static;flex-shrink:0;min-height:40px}.record-actions .group-picker>label{gap:8px}.record-actions .new-group-fields{flex-wrap:wrap}
+
+.chart-workspace>.workspace-pane{min-width:0}
+.chart-workspace[data-active-page="chart"]>.workspace-gua,.chart-workspace[data-active-page="gua"]>.workspace-chart{display:none}
+/* Use screen height so an Android software keyboard does not switch a tablet back to one pane. */
+@media(min-width:900px) and (min-device-height:600px) and (orientation:landscape){
+  .workspace-topbar{max-width:1600px;padding:0 20px}
+  .workspace-main{display:flex;flex-direction:column;max-width:1600px;height:calc(100vh - 150px);height:calc(100vh - 150px - env(safe-area-inset-bottom));height:calc(100dvh - 150px - env(safe-area-inset-bottom));min-height:0;padding:0 20px 12px}
+  .workspace-main>.display-settings{flex-shrink:0;margin-bottom:12px;padding:8px 12px}
+  .chart-workspace{display:grid;grid-template-columns:minmax(0,55fr) minmax(0,45fr);grid-template-rows:minmax(0,1fr);gap:20px;flex:1;min-height:0}
+  .workspace-main .chart-workspace>.workspace-pane{display:block;min-height:0;overflow-y:auto;overscroll-behavior-y:contain;padding:0 4px 24px 0;scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+  .workspace-chart .chart-heading{padding:6px 0 8px}
+  .workspace-chart .chart-heading .eyebrow{display:none}
+  .workspace-chart .chart-heading h1{font-size:20px;margin:0}
+  .workspace-chart .chart-heading p{font-size:10px;margin-top:3px}
+  .workspace-chart .lunar-line{margin-bottom:12px;flex-wrap:wrap;line-height:1.6}
+  .workspace-chart .brightness-control,.workspace-chart .age-display{display:inline-flex;vertical-align:middle;min-height:38px;margin:0 0 10px;flex-wrap:nowrap}
+  .workspace-chart .brightness-control{width:calc(56% - 5px)}
+  .workspace-chart .age-display{width:calc(44% - 5px)}
+  .workspace-chart .age-display .muted{display:none}
+  .workspace-chart .periods{margin-bottom:12px}
+  .workspace-chart .chart-year-context{display:none}
+  .workspace-chart .chart-grid{grid-template-rows:repeat(4,minmax(110px,auto))}
+  .workspace-chart .chart-grid .palace{padding:7px 5px;gap:3px}
+  .workspace-chart .cell-top{font-size:10px;padding-right:17px}
+  .workspace-chart .cell-hour{right:5px;top:7px;font-size:11px}
+  .workspace-chart .major{font-size:13px}
+  .workspace-chart .major small{font-size:9px}
+  .workspace-chart .minor-stars{font-size:10.5px;line-height:1.45}
+  .workspace-chart .star-brightness{font-size:8px}
+  .workspace-chart .cell-ages{font-size:9px;gap:0 3px}
+  .workspace-chart .cell-ages>small{font-size:8px}
+  .workspace-chart .cell-bottom strong{font-size:12px}
+  .workspace-chart .cell-bottom small{font-size:9px}
+  .workspace-chart .chart-center{gap:4px;padding:8px 6px}
+  .workspace-chart .chart-center>b{font-size:18px;line-height:1.3}
+  .workspace-chart .chart-center>.center-date{font-size:10px;line-height:1.5}
+  .workspace-chart .center-pillars{gap:3px;max-width:210px}
+  .workspace-chart .center-pillars small{font-size:9px!important;line-height:1.4}
+  .workspace-chart .center-pillars strong{font-size:22px;line-height:1.1}
+  .workspace-chart .chart-center>.center-summary{font-size:10px;line-height:1.5}
+  .workspace-chart .center-mini-gua>small{font-size:9px;line-height:1.4}
+  .workspace-chart .center-mini-gua>small:last-child{font-size:8px}
+  .workspace-chart .center-gua .center-mini-gua>b{font-size:11px;line-height:1.5}
+  .workspace-chart .center-mini-gua .hexagram{width:44px;gap:3px;margin:6px auto 4px}
+  .workspace-gua>.page-heading{padding:8px 0 18px}
+  .workspace-gua>.page-heading h1{font-size:23px;margin:7px 0 10px}
+  .workspace-gua>.page-heading p{font-size:11px;line-height:1.7}
+  .workspace-gua .gua-source{margin-bottom:14px}
+  .workspace-gua .gua-time-note,.workspace-gua .gua-notice{padding:11px 13px;margin-bottom:14px}
+  .workspace-gua .pillar-card{padding:14px 8px;margin-bottom:14px}
+  .workspace-gua .pillar-card b{font-size:21px}
+  .workspace-gua .gua-pair{grid-template-columns:repeat(auto-fit,minmax(245px,1fr));gap:14px}
+  .workspace-gua .gua-card{padding:18px 14px 16px}
+  .workspace-gua .gua-card h2{font-size:21px;margin:10px 0 18px}
+  .workspace-gua .hexagram.has-ranges{width:110px;margin:24px auto 24px calc(50% - 100px)}
+  .workspace-gua .yao .yao-age{left:136px;font-size:12px}
+  .workspace-gua .section-head{flex-wrap:wrap;gap:8px}
+}

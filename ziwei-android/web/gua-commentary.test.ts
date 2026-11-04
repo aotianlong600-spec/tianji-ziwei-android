@@ -23,4 +23,7 @@ assert.ok(commentaryHTML(63,'before').includes('真正丈夫在上位'));
 assert.ok(!commentaryHTML(63,'annual').includes('真正丈夫在上位'),'先后天共用补充不能冒充流年专属断语');
 assert.ok(GUA_COMMENTARIES.find(row=>row.code===50)!.inferredCategories.includes('before'));
 assert.throws(()=>commentaryHTML(64,'before'),/卦码/);
+const chartAnnual=commentaryHTML(63,'annual','chart-');
+assert.ok(chartAnnual.includes('id="chart-commentary-annual-63"'),'双栏左侧条辨必须有独立定位ID');
+assert.equal(chartAnnual.replace('id="chart-commentary-','id="commentary-'),commentaryHTML(63,'annual'),'双栏条辨正文与原条辨一致');
 console.log('卦条辨测试通过：64卦码映射、192分类、分类元数据、共享补充与原文分类边界');
