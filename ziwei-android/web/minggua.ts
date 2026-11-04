@@ -136,6 +136,11 @@ export function annualGua(m: Minggua, age: number): Gua & { period: Period; age:
   const year = m.birthYear + age - 1;
   return { code, line, period, age, year, stemBranch: stems[mod(year - 4, 10)] + branches[mod(year - 4, 12)] };
 }
+export function annualGuaForYear(m:Minggua,year:number):ReturnType<typeof annualGua>|null {
+  if(!Number.isInteger(year))throw new Error('年份须为整数');
+  const age=year-m.birthYear+1;
+  return m.periods.some(p=>age>=p.startAge&&age<=p.endAge)?annualGua(m,age):null;
+}
 export function monthGuas(gua: Gua): Array<Gua & { month: number }> {
   checkGua(gua);
   const months: Array<Gua & { month: number }> = [];

@@ -65,7 +65,6 @@
   .workspace-chart .age-display{width:calc(44% - 5px)}
   .workspace-chart .age-display .muted{display:none}
   .workspace-chart .periods{margin-bottom:12px}
-  .workspace-chart .chart-year-context{display:none}
   .workspace-chart .chart-grid{grid-template-rows:repeat(4,minmax(110px,auto))}
   .workspace-chart .chart-grid .palace{padding:7px 5px;gap:3px}
   .workspace-chart .cell-top{font-size:10px;padding-right:17px}
@@ -103,3 +102,5 @@
   .workspace-gua .yao .yao-age{left:136px;font-size:12px}
   .workspace-gua .section-head{flex-wrap:wrap;gap:8px}
 }
+
+.chart-annual-fold{margin:0 0 12px;border-radius:11px;overflow:hidden}.chart-annual-fold>summary{display:flex;align-items:center;gap:10px;min-height:44px;padding:10px 12px;font-size:12px;color:var(--plum);font-weight:600;cursor:pointer;list-style:none}.chart-annual-fold>summary::-webkit-details-marker{display:none}.chart-annual-fold>summary>span{margin-left:auto;font-size:10px;color:var(--muted);font-weight:400}.chart-annual-fold>summary>i{font-style:normal;transition:transform .15s}.chart-annual-fold[open]>summary>i{transform:rotate(180deg)}.chart-annual-content{padding:0 12px 12px}.chart-annual-content .chart-year-summary{width:100%;margin:0;padding:8px 15px;gap:28px;text-align:left;border-radius:8px}.chart-year-summary strong{display:block;font:23px serif;margin:7px 0}.annual-description{display:block;font-size:11px;color:var(--muted);line-height:1.7}.chart-annual-content .chart-year-summary .text-button{display:block}.chart-annual-content>.field-note{margin:5px 0;line-height:1.9}.chart-annual-content .gua-commentary{margin:8px 0 0}.unavailable-year .gua-notice{margin-top:18px}

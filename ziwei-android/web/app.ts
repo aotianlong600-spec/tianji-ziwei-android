@@ -1,5 +1,5 @@
 import { makeChart, toBirthInfo, actualLunarLabel, pillarContext, type BirthInput } from './model';
-import { fromPillars, textbookExample, annualGua, hexName, lineName } from './minggua';
+import { fromPillars, textbookExample, annualGuaForYear, hexName, lineName } from './minggua';
 import { mingguaHTML, guaDiagram } from './minggua-view';
 import { commentaryHTML } from './gua-commentary';
 import { dailyFromDate, solarMonthStart, dailySolarDate, dailyCalendarDates, type DailyCalendar } from './daily-gua';
@@ -52,6 +52,7 @@ let periodIndex = 0;
 let targetYear = new Date().getFullYear();
 let guaExample = false;
 let guaAge = 1;
+let chartAnnualOpen=false, unavailableGuaYear:number|null=null;
 let guaDate='', guaClock='12:00:00', guaDayError='';
 let guaCalendar:DailyCalendar='solar', guaLeap=false;
 let storageError = false;
@@ -70,7 +71,7 @@ function toast(message:string) {
 }
 function changePage(next:Page) {
   page=next;
-  if(next==='chart'&&guaExample){guaExample=false;guaAge=1;guaDate='';guaDayError='';}
+  if(next==='chart'&&guaExample){guaExample=false;guaAge=1;guaDate='';guaDayError='';unavailableGuaYear=null;}
   render();
   const pane=root.querySelector<HTMLElement>(next==='chart'?'.workspace-chart':'.workspace-gua');
   if(pane){pane.scrollTop=0;pane.scrollLeft=0;}
@@ -106,7 +107,7 @@ function formHTML() {
     <p class="field-note">时辰与准确时间须一致；晚子时请填写23点的准确时间。四柱节气按北京时间计算；本版不自动校正真太阳时。未填准确时间时，命卦按所选时辰中点估算。</p>
     <p id="form-error" role="alert" class="error" hidden></p><button class="primary wide" type="submit">起盘 <span>→</span></button>
     <button type="button" id="sample" class="text-button wide">先看看示例命盘</button>
-  </form><div class="assurance"><span>◌</span><p>本机离线排盘<br><small>出生资料仅保存在这台设备</small></p><span class="seal">天<br>纪</span></div><details class="rules"><summary>版本与开源信息</summary><p>天纪紫微 1.7.0<br>排盘引擎：ziwei-doushu、iztro<br>命卦依据《天机道》独立实现<br><a href="THIRD_PARTY_NOTICES.txt">查看开源许可</a></p></details>`;
+  </form><div class="assurance"><span>◌</span><p>本机离线排盘<br><small>出生资料仅保存在这台设备</small></p><span class="seal">天<br>纪</span></div><details class="rules"><summary>版本与开源信息</summary><p>天纪紫微 1.8.0<br>排盘引擎：ziwei-doushu、iztro<br>命卦依据《天机道》独立实现<br><a href="THIRD_PARTY_NOTICES.txt">查看开源许可</a></p></details>`;
 }
 function starsHTML(p:Palace) {
   const majors=p.stars.filter(s=>s.type==='major');
@@ -131,11 +132,9 @@ function chartHTML() {
   const yearContext=yearPalaces(c,targetYear);
   let yearSummary='';
   if(period==='year') {
-    const age=targetYear-minggua.birthYear+1;
-    if(age>=1&&age<=minggua.periods.slice(-1)[0].endAge) {
-      const annual=annualGua(minggua,age);
-      yearSummary=`<section class="card chart-year-summary"><div>${guaDiagram(annual)}</div><div><span class="eyebrow">四柱流年卦 · ${targetYear} · ${annual.stemBranch}</span><h2>${hexName(annual.code)}</h2><p>命卦第${age}岁 · 动爻 ${lineName(annual.code,annual.line)}</p><button class="text-button" data-gua-year="${targetYear}">查看这一年与十二流月 →</button></div></section>${commentaryHTML(annual.code,'annual','chart-')}`;
-    } else yearSummary='<p class="field-note">所选年份不在这张命卦的先后天大运范围内。</p>';
+    const annual=annualGuaForYear(minggua,targetYear);
+    const content=annual?`<button type="button" class="chart-year-summary" data-gua-year="${targetYear}" aria-label="查看${targetYear}年${hexName(annual.code)}与流月"><span>${guaDiagram(annual)}</span><span><span class="eyebrow">${targetYear} · ${annual.stemBranch}</span><strong>${hexName(annual.code)}</strong><span class="annual-description">命卦第${annual.age}岁 · 动爻 ${lineName(annual.code,annual.line)}</span><span class="text-button">查看这一年与十二流月 →</span></span></button>${commentaryHTML(annual.code,'annual','chart-')}`:'<p class="field-note">所选年份不在这张命卦的先后天大运范围内。</p>';
+    yearSummary=`<details class="card chart-annual-fold" id="chart-annual-fold" ${chartAnnualOpen?'open':''}><summary>流年卦<span>${targetYear}年${annual?` · ${hexName(annual.code)}`:' · 超出命卦范围'}</span><i aria-hidden="true">⌄</i></summary><div class="chart-annual-content">${content}</div></details>`;
   }
   return `<section class="chart-heading"><div><span class="eyebrow">ZI WEI DOU SHU</span><h1>${escape(currentInput.name || '未命名命盘')}</h1><p>${hideBirth?'生辰已隐藏':`${b.year}.${String(b.month).padStart(2,'0')}.${String(b.day).padStart(2,'0')} · ${BRANCHES[b.hour]}时 · ${b.gender==='male'?'男':'女'}`}</p></div><button class="outline" id="edit">修改</button></section>
     ${hideBirth?'':`<div class="lunar-line">农历 ${escape(actualLunarLabel(currentInput))}<span>${escape(c.yinYangGender || '')} · ${c.wuxingJuName}</span></div>`}
@@ -160,6 +159,7 @@ function historyHTML() {
 function guaPageHTML() {
   if (!currentInput && !guaExample) return `<section class="page-heading"><span class="eyebrow">四柱 · 先天 · 后天</span><h1>四柱命卦</h1><p>从生辰排先后天卦，查看流年、流月与流日。</p></section><div class="card empty"><span>☰</span><h2>先填写出生信息</h2><p>或查看书中的风水涣例案：<br>一岁元堂九二，后天为地风升。</p><button class="primary" data-page="form">填写生辰</button><button class="text-button wide" data-gua-source="book">查看书中例案</button></div>`;
   try {
+    if(!guaExample&&unavailableGuaYear!==null)return `<section class="page-heading unavailable-year"><span class="eyebrow">四柱流年卦</span><h1>${unavailableGuaYear}年流年卦</h1><p class="gua-notice">所选年份不在这张命卦的先天、后天两轮大运范围内。请在左侧选择其他年份。</p><button class="outline" data-reset-gua>查看先后天命卦</button></section>`;
     if (guaExample) return mingguaHTML(textbookExample(),guaAge,true,'',guaDate,guaClock,guaDayError,guaCalendar,guaLeap,hideBirth);
     const context=pillarContext(currentInput!);
     const data=fromPillars(context.pillars,currentInput!.gender,context.birthYear,currentInput!.hour,context.yangSeason);
@@ -172,6 +172,18 @@ function activeMinggua() {
   if(!currentInput)throw new Error('请先起盘');
   const c=pillarContext(currentInput);
   return fromPillars(c.pillars,currentInput.gender,c.birthYear,currentInput.hour,c.yangSeason);
+}
+function selectChartYear(year:number) {
+  const wasExample=guaExample, previousAge=guaAge;
+  targetYear=year;guaExample=false;
+  const annual=annualGuaForYear(activeMinggua(),year);
+  unavailableGuaYear=annual?null:year;
+  if(annual)guaAge=annual.age;
+  if(wasExample||!annual||annual.age!==previousAge){guaDate='';guaDayError='';}
+}
+function scrollToAnnualGua() {
+  const el=root.querySelector<HTMLElement>('.workspace-gua .annual-gua,.workspace-gua .unavailable-year')||root.querySelector<HTMLElement>('.annual-gua,.unavailable-year');
+  if(el?.getClientRects().length)el.scrollIntoView({block:'start'});
 }
 function readDailyForm() {
   const form=new FormData(root.querySelector<HTMLFormElement>('#daily-form')!);
@@ -187,6 +199,7 @@ function openInput(input:BirthInput,group='') {
   try {
     const next=makeChart(input);
     renderedGuaState='';
+    chartAnnualOpen=false;unavailableGuaYear=null;
     saveGroup=records.find(r=>JSON.stringify(r.input)===JSON.stringify(input))?.group??group;
     draft={...input}; currentInput={...input}; chart=next; selected=null; period='natal'; guaExample=false; guaAge=1;guaDate='';guaDayError=''; periodIndex=Math.max(0,next.currentDaXianIndex); changePage('chart');
   } catch(e) { toast(e instanceof Error?e.message:'起盘失败，请核对出生信息'); }
@@ -198,7 +211,7 @@ function store(next:RecordEntry[]) {
 function render() {
   const paneScroll=Array.from(root.querySelectorAll<HTMLElement>('.workspace-pane'),el=>el.scrollTop);
   const openCommentaries=new Set(Array.from(root.querySelectorAll<HTMLDetailsElement>('.gua-commentary[open]'),el=>el.id));
-  const guaState=JSON.stringify([currentInput&&{...currentInput,name:'',brightness:undefined},guaExample,guaAge,guaDate,guaClock,guaDayError,guaCalendar,guaLeap]);
+  const guaState=JSON.stringify([currentInput&&{...currentInput,name:'',brightness:undefined},guaExample,guaAge,unavailableGuaYear,guaDate,guaClock,guaDayError,guaCalendar,guaLeap]);
   const dailyDraft=guaState===renderedGuaState?Array.from(root.querySelectorAll<HTMLInputElement|HTMLSelectElement>('#daily-form [name]'),el=>({name:el.name,value:el.value,checked:el instanceof HTMLInputElement&&el.checked})):[];
   renderedGuaState=guaState;
   clearConnections();
@@ -227,11 +240,13 @@ function render() {
     render();
   });
   root.querySelectorAll<HTMLButtonElement>('[data-page]').forEach(el=>el.onclick=()=>changePage(el.dataset.page as Page));
-  root.querySelectorAll<HTMLButtonElement>('[data-gua-source]').forEach(el=>el.onclick=()=>{guaExample=el.dataset.guaSource==='book';guaAge=1;guaDate='';guaDayError='';changePage('gua');});
+  root.querySelectorAll<HTMLButtonElement>('[data-gua-source]').forEach(el=>el.onclick=()=>{guaExample=el.dataset.guaSource==='book';guaAge=1;guaDate='';guaDayError='';unavailableGuaYear=null;changePage('gua');});
   root.querySelector<HTMLSelectElement>('#gua-age')?.addEventListener('change',e=>{guaAge=Number((e.target as HTMLSelectElement).value);guaDate='';guaDayError='';render();});
   root.querySelectorAll<HTMLButtonElement>('[data-gua-age]').forEach(el=>el.onclick=()=>{const scroll=root.querySelector('.year-strip')?.scrollLeft||0;guaAge=Number(el.dataset.guaAge);guaDate='';guaDayError='';render();const strip=root.querySelector('.year-strip');if(strip)strip.scrollLeft=scroll;});
-  root.querySelectorAll<HTMLButtonElement>('[data-gua-year]').forEach(el=>el.onclick=()=>{if(!currentInput)return;guaExample=false;guaAge=Number(el.dataset.guaYear)-pillarContext(currentInput).birthYear+1;guaDate='';guaDayError='';changePage('gua');});
-  root.querySelector<HTMLButtonElement>('[data-gua-current]')?.addEventListener('click',()=>{guaExample=false;guaAge=1;guaDate='';guaDayError='';changePage('gua');});
+  root.querySelectorAll<HTMLButtonElement>('[data-gua-year]').forEach(el=>el.onclick=()=>{if(!currentInput)return;selectChartYear(Number(el.dataset.guaYear));changePage('gua');scrollToAnnualGua();});
+  root.querySelector<HTMLButtonElement>('[data-gua-current]')?.addEventListener('click',()=>{guaExample=false;guaAge=1;guaDate='';guaDayError='';unavailableGuaYear=null;changePage('gua');});
+  root.querySelector<HTMLButtonElement>('[data-reset-gua]')?.addEventListener('click',()=>{unavailableGuaYear=null;guaAge=1;guaDate='';guaDayError='';render();});
+  root.querySelector<HTMLElement>('#chart-annual-fold>summary')?.addEventListener('click',e=>{e.preventDefault();chartAnnualOpen=!chartAnnualOpen;if(chartAnnualOpen)selectChartYear(targetYear);render();root.querySelector<HTMLElement>('#chart-annual-fold>summary')?.focus();if(chartAnnualOpen)scrollToAnnualGua();});
   root.querySelector<HTMLFormElement>('#daily-form')?.addEventListener('submit',e=>{
     e.preventDefault();const query=readDailyForm();
     guaDate=query.date;guaClock=query.clock;guaLeap=query.leap;guaDayError='';
@@ -250,7 +265,7 @@ function render() {
     try{const m=activeMinggua(),moment=solarMonthStart(m.birthYear+guaAge-1,Number(el.dataset.guaMonth)),dates=dailyCalendarDates(moment.slice(0,10));guaDate=guaCalendar==='lunar'?dates.lunar:dates.solar;guaLeap=dates.leap;guaClock=moment.slice(11);guaDayError='';render();root.querySelector('#daily-gua')?.scrollIntoView({block:'start'});}catch(error){toast((error as Error).message);}
   });
   root.querySelectorAll<HTMLButtonElement>('[data-open-commentary]').forEach(el=>el.onclick=()=>{
-    guaExample=false;guaAge=1;guaDate='';guaDayError='';const category=el.dataset.openCommentary as 'before'|'after';
+    guaExample=false;guaAge=1;guaDate='';guaDayError='';unavailableGuaYear=null;const category=el.dataset.openCommentary as 'before'|'after';
     const data=activeMinggua(),code=data[category].code;changePage('gua');
     const details=root.querySelector<HTMLDetailsElement>(`#commentary-${category}-${code}`);
     if(details){details.open=true;details.scrollIntoView({block:'start'});}
@@ -264,11 +279,11 @@ function render() {
   root.querySelectorAll<HTMLButtonElement>('[data-calendar]').forEach(el=>el.onclick=()=>{draft={...readForm(),calendar:el.dataset.calendar as BirthInput['calendar'],leap:false};render();});
   const sample=root.querySelector<HTMLButtonElement>('#sample');if(sample) sample.onclick=()=>openInput({name:'示例命盘',year:1990,month:6,day:15,hour:6,gender:'male',calendar:'solar',leap:false});
   root.querySelectorAll<HTMLButtonElement>('[data-palace]').forEach(el=>el.onclick=()=>{selected=selected===Number(el.dataset.palace)?null:Number(el.dataset.palace);render();});
-  root.querySelectorAll<HTMLButtonElement>('[data-period]').forEach(el=>el.onclick=()=>{period=el.dataset.period!;render();});
-  root.querySelectorAll<HTMLButtonElement>('[data-year-step]').forEach(el=>el.onclick=()=>{targetYear=Math.max(1900,Math.min(2100,targetYear+Number(el.dataset.yearStep)));render();});
+  root.querySelectorAll<HTMLButtonElement>('[data-period]').forEach(el=>el.onclick=()=>{period=el.dataset.period!;if(period==='year')selectChartYear(targetYear);else unavailableGuaYear=null;render();if(period==='year')scrollToAnnualGua();});
+  root.querySelectorAll<HTMLButtonElement>('[data-year-step]').forEach(el=>el.onclick=()=>{selectChartYear(Math.max(1900,Math.min(2100,targetYear+Number(el.dataset.yearStep))));render();scrollToAnnualGua();});
   root.querySelector<HTMLSelectElement>('#decadal')?.addEventListener('change',e=>{periodIndex=Number((e.target as HTMLSelectElement).value);render();});
-  root.querySelector<HTMLInputElement>('#target-year')?.addEventListener('change',e=>{const y=Number((e.target as HTMLInputElement).value);if(!Number.isInteger(y)||y<1900||y>2100){toast('流年范围为 1900–2100');render();return;}if(y===targetYear)return;targetYear=y;render();});
-  root.querySelector<HTMLInputElement>('#target-year')?.addEventListener('input',e=>{const raw=(e.target as HTMLInputElement).value;const y=Number(raw);if(raw.length===4&&Number.isInteger(y)&&y>=1900&&y<=2100){targetYear=y;render();}});
+  root.querySelector<HTMLInputElement>('#target-year')?.addEventListener('change',e=>{const y=Number((e.target as HTMLInputElement).value);if(!Number.isInteger(y)||y<1900||y>2100){toast('流年范围为 1900–2100');render();return;}if(y===targetYear)return;selectChartYear(y);render();scrollToAnnualGua();});
+  root.querySelector<HTMLInputElement>('#target-year')?.addEventListener('input',e=>{const raw=(e.target as HTMLInputElement).value;const y=Number(raw);if(raw.length===4&&Number.isInteger(y)&&y>=1900&&y<=2100){selectChartYear(y);render();scrollToAnnualGua();}});
   const edit=root.querySelector<HTMLButtonElement>('#edit');if(edit) edit.onclick=()=>changePage('form');
   root.querySelector<HTMLSelectElement>('#history-group')?.addEventListener('change',e=>{const value=(e.target as HTMLSelectElement).value;historyGroup=value==='@all'?null:value.slice(6);render();});
   root.querySelectorAll<HTMLFormElement>('.group-picker').forEach(form=>{

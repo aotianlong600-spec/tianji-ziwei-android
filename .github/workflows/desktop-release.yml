@@ -1,0 +1,95 @@
+name: Desktop release
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win
+            arch: x64
+          - os: macos-15-intel
+            platform: mac
+            arch: x64
+          - os: macos-15
+            platform: mac
+            arch: arm64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            ziwei-doushu/package-lock.json
+            desktop/package-lock.json
+      - name: Check version and native architecture
+        env:
+          EXPECTED_ARCH: ${{ matrix.arch }}
+        run: |
+          node -e "const a=require('node:assert/strict'),v=require('./desktop/package.json').version;a.equal(process.arch,process.env.EXPECTED_ARCH);a.equal(v,require('./ziwei-doushu/package.json').version);if(process.env.GITHUB_REF_TYPE==='tag')a.equal(process.env.GITHUB_REF_NAME,'v'+v)"
+      - run: npm ci --prefix ziwei-doushu --no-audit --no-fund
+      - run: npm ci --prefix desktop --no-audit --no-fund
+      - name: Test desktop security boundary and offline renderer
+        run: |
+          npm test --prefix desktop
+          npm run prepare:web --prefix desktop
+          npm run test:smoke --prefix desktop
+      - name: Package native desktop app
+        run: npm run dist:${{ matrix.platform }} --prefix desktop -- --${{ matrix.arch }}
+      - name: Verify macOS bundle signature and architecture
+        if: matrix.platform == 'mac'
+        env:
+          EXPECTED_ARCH: ${{ matrix.arch }}
+        run: |
+          bundle="$(find desktop/build/dist -maxdepth 2 -name '*.app' -type d -print -quit)"
+          test -n "$bundle"
+          codesign --verify --deep --strict --verbose=2 "$bundle"
+          file "$bundle/Contents/MacOS/天纪紫微"
+          if [ "$EXPECTED_ARCH" = x64 ]; then native_arch=x86_64; else native_arch=arm64; fi
+          lipo -verify_arch "$native_arch" "$bundle/Contents/MacOS/天纪紫微"
+      - name: Upload desktop package
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: desktop-${{ matrix.platform }}-${{ matrix.arch }}
+          path: |
+            desktop/build/dist/tianji-ziwei-*.exe
+            desktop/build/dist/tianji-ziwei-*.zip
+          if-no-files-found: error
+
+  attach-to-release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8.0.2
+        with:
+          pattern: desktop-*
+          path: packages
+          merge-multiple: true
+      - name: Attach packages to existing versioned release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          gh release view "$RELEASE_TAG"
+          gh release upload "$RELEASE_TAG" packages/* --clobber

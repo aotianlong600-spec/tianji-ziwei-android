@@ -1,0 +1,39 @@
+{
+  "name": "tianji-ziwei-desktop",
+  "version": "1.8.0",
+  "private": true,
+  "description": "天纪紫微离线桌面版",
+  "author": "天纪紫微 contributors",
+  "license": "MIT",
+  "main": "main.cjs",
+  "scripts": {
+    "postinstall": "node node_modules/electron/install.js",
+    "prepare:web": "node ../ziwei-android/build-web.cjs && node prepare.cjs",
+    "test": "node policy.test.cjs",
+    "test:smoke": "node smoke-runner.cjs",
+    "start": "npm run prepare:web && electron .",
+    "dist:win": "npm run prepare:web && electron-builder --win portable --x64 --publish never",
+    "dist:mac": "npm run prepare:web && electron-builder --mac zip --publish never"
+  },
+  "devDependencies": {
+    "electron": "45.2.2",
+    "electron-builder": "26.18.0"
+  },
+  "build": {
+    "appId": "com.tianji.ziwei",
+    "productName": "天纪紫微",
+    "directories": { "output": "build/dist" },
+    "files": ["main.cjs", "runtime.cjs", "policy.cjs", "build/web/*", "LICENSE"],
+    "artifactName": "tianji-ziwei-${version}-${os}-${arch}.${ext}",
+    "win": { "target": "portable", "signExecutable": false },
+    "mac": {
+      "target": "zip",
+      "category": "public.app-category.lifestyle",
+      "identity": "-",
+      "hardenedRuntime": true,
+      "entitlements": "entitlements.mac.plist",
+      "entitlementsInherit": "entitlements.mac.plist",
+      "darkModeSupport": true
+    }
+  }
+}
