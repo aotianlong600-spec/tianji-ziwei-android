@@ -1,4 +1,4 @@
-const { BrowserWindow, protocol, session } = require('electron');
+const { BrowserWindow, protocol, session, screen } = require('electron');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const { createHash } = require('node:crypto');
@@ -39,6 +39,15 @@ async function createWindow(show = true, page = HOME) {
       nodeIntegration: false, contextIsolation: true, sandbox: true,
       webSecurity: true, webviewTag: false, spellcheck: false,
     },
+  });
+  const bounds = win.getBounds(), area = screen.getDisplayMatching(win.getBounds()).workArea;
+  const width = Math.min(bounds.width, area.width), height = Math.min(bounds.height, area.height);
+  if (area.width < 960 || area.height < 600) {
+    win.setMinimumSize(Math.min(960, area.width), Math.min(600, area.height));
+  }
+  win.setBounds({
+    x: area.x + Math.floor((area.width - width) / 2),
+    y: area.y + Math.floor((area.height - height) / 2), width, height,
   });
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.webContents.on('will-navigate', (event, url) => {

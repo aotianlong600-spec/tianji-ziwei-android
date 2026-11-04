@@ -1,4 +1,4 @@
-const { app, session, BrowserWindow } = require('electron');
+const { app, session, BrowserWindow, screen } = require('electron');
 const assert = require('node:assert/strict');
 const { configure, createWindow } = require('./runtime.cjs');
 
@@ -9,6 +9,10 @@ app.whenReady().then(async () => {
   await configure();
   console.log('Desktop smoke: configured');
   let win = await createWindow(false);
+  const bounds = win.getBounds(), area = screen.getDisplayMatching(bounds).workArea;
+  assert.ok(bounds.x >= area.x && bounds.y >= area.y);
+  assert.ok(bounds.x + bounds.width <= area.x + area.width);
+  assert.ok(bounds.y + bounds.height <= area.y + area.height);
   console.log('Desktop smoke: first page loaded');
   const preferences = win.webContents.getLastWebPreferences();
   assert.equal(preferences.nodeIntegration, false);
