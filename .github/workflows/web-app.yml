@@ -1,0 +1,59 @@
+name: iPhone and iPad web app
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'pwa/**'
+      - 'ziwei-android/web/**'
+      - 'ziwei-android/build-web.cjs'
+      - 'ziwei-doushu/lib/**'
+      - 'ziwei-doushu/package*.json'
+      - '.github/workflows/web-app.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pages: read
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: ziwei-doushu/package-lock.json
+      - run: npm ci --prefix ziwei-doushu --no-audit --no-fund
+      - run: npm test --prefix ziwei-doushu
+      - run: npm run typecheck --prefix ziwei-doushu
+      - run: node ziwei-android/build-web.cjs
+      - run: node pwa/build.cjs
+      - run: node --test pwa/build.test.cjs pwa/client.test.cjs pwa/sw.test.cjs
+      - uses: actions/configure-pages@v6.0.0
+      - uses: actions/upload-pages-artifact@v5.0.0
+        with:
+          path: pwa/build
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v5.0.1
+        id: deployment

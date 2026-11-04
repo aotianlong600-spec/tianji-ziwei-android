@@ -1,6 +1,8 @@
-# 天纪紫微 · Android / Windows / macOS
+# 天纪紫微 · Android / Windows / macOS / iPhone / iPad
 
 离线紫微斗数与四柱命卦工具，支持 Android、Windows 和 macOS。无需账号，排盘与档案均在本机完成。当前版本 **1.8.0**。
+
+iPhone 和 iPad 可使用[网页 App](https://aotianlong600-spec.github.io/tianji-ziwei-android/)，在 Safari 中添加到主屏幕，联网准备完成后支持离线排盘；详细安装、更新和档案说明见 [pwa/README.md](pwa/README.md)。
 
 Android版支持8.0及以上，原生Java Activity加本地WebView，不请求联网、定位或存储权限。桌面版复用同一套排盘程序，默认1440×900宽屏；Windows提供免安装程序，Mac分别提供Intel与Apple芯片版本。桌面编译和平台要求见 [desktop/README.md](desktop/README.md)。
 

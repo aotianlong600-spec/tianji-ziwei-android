@@ -43,6 +43,19 @@ else wideScreen.addListener(updateWorkspaceLayout);
 
 type Page = 'form' | 'chart' | 'gua' | 'history';
 const root = document.querySelector<HTMLDivElement>('#app')!;
+const isWebApp=document.documentElement.dataset.pwa==='true';
+if(isWebApp&&window.visualViewport){
+  const viewport=window.visualViewport;
+  const updateViewport=()=>{if(viewport.scale===1)document.documentElement.style.setProperty('--pwa-viewport-height',`${viewport.height}px`);};
+  viewport.addEventListener('resize',updateViewport);updateViewport();
+}
+let webAppStatus='首次联网加载后，将准备离线资源。';
+window.addEventListener('pwa-status',event=>{
+  const message=(event as CustomEvent<{message?:unknown}>).detail?.message;
+  if(typeof message!=='string')return;
+  webAppStatus=message;
+  const el=root.querySelector<HTMLElement>('#pwa-status');if(el)el.textContent=message;
+});
 const storageKey = 'tianji-charts-v1';
 const hours = ['子时 23:00–01:00','丑时 01:00–03:00','寅时 03:00–05:00','卯时 05:00–07:00','辰时 07:00–09:00','巳时 09:00–11:00','午时 11:00–13:00','未时 13:00–15:00','申时 15:00–17:00','酉时 17:00–19:00','戌时 19:00–21:00','亥时 21:00–23:00'];
 const positions: Record<number,[number,number]> = {5:[1,1],6:[1,2],7:[1,3],8:[1,4],4:[2,1],9:[2,4],3:[3,1],10:[3,4],2:[4,1],1:[4,2],0:[4,3],11:[4,4]};
@@ -85,6 +98,10 @@ function changePage(next:Page) {
 }
 function option(value:unknown,label:string,current:unknown) { return `<option value="${escape(value)}" ${value===current?'selected':''}>${escape(label)}</option>`; }
 function numeric(value:number) { return Number.isFinite(value)?value:''; }
+function webAppInstallHTML() {
+  if(!isWebApp)return '';
+  return `<aside class="pwa-install card"><details><summary>添加到 iPhone / iPad 主屏幕</summary><ol><li>用 Safari 打开此网页。</li><li>点“分享”→“添加到主屏幕”；若有“作为网页 App 打开”，请开启。</li><li>从主屏幕图标打开，等下方显示“离线已就绪”后即可离线排盘。</li></ol></details><p>建议先添加到主屏幕，再保存命盘。Safari、主屏幕版和不同设备的档案分别保存。</p><small id="pwa-status" role="status">${escape(webAppStatus)}</small></aside>`;
+}
 function groupPickerHTML(group:string,recordId?:string) {
   const groups=[...new Set([...recordGroups(records),group].filter(Boolean))].sort((a,b)=>a.localeCompare(b,'zh-CN'));
   return `<form class="group-picker" ${recordId===undefined?'id="save-group-form"':`data-group-record="${escape(recordId)}"`}><label>分组<select name="group" aria-label="命盘分组">${option('group:','未分组',`group:${group}`)}${groups.map(name=>option(`group:${name}`,name,`group:${group}`)).join('')}<option value="@new">＋ 新建分组</option></select></label><div class="new-group-fields" hidden><input name="new-group" maxlength="30" placeholder="输入分组名称" aria-label="新分组名称" disabled><button class="outline" type="submit">确定</button></div></form>`;
@@ -101,7 +118,7 @@ function displaySettingsHTML() {
 }
 function formHTML() {
   return `<section class="intro"><span class="eyebrow">始于生辰 · 归于十二宫</span><h1>观星知序<span>天纪紫微</span></h1><p>依据《天机道》排盘表，安星成盘。</p><div class="compass" aria-hidden="true"><span>✦</span></div></section>
-  <form id="birth-form" class="card form-card" novalidate>
+  ${webAppInstallHTML()}<form id="birth-form" class="card form-card" novalidate>
     <div class="section-head"><h2>新建命盘</h2><span class="muted">出生信息</span></div>
     <label class="field">姓名或称呼 <span class="optional">选填</span><input name="name" maxlength="30" autocomplete="off" placeholder="为这张命盘取个名字" value="${escape(draft.name)}"></label>
     <div class="field"><span>出生历法</span><div class="segmented"><button type="button" data-calendar="solar" class="${draft.calendar==='solar'?'active':''}">公历</button><button type="button" data-calendar="lunar" class="${draft.calendar==='lunar'?'active':''}">农历</button></div></div>
@@ -222,6 +239,7 @@ function render() {
   renderedGuaState=guaState;
   clearConnections();
   const workspace=(page==='chart'||page==='gua')&&chart&&currentInput&&!guaExample;
+  if(isWebApp)document.body.classList.toggle('has-workspace',!!workspace);
   const content=workspace?`<div class="chart-workspace" data-active-page="${page}"><section class="workspace-pane workspace-chart" aria-label="紫微命盘" tabindex="0">${chartHTML()}</section><section class="workspace-pane workspace-gua" aria-label="四柱命卦" tabindex="0">${guaPageHTML()}</section></div>`:page==='form'?formHTML():page==='chart'?chartHTML():page==='gua'?guaPageHTML():historyHTML();
   root.innerHTML=`<header class="topbar ${workspace?'workspace-topbar':''}"><span class="brand"><i>✦</i> 天纪紫微</span><span class="offline"><i></i> 离线排盘</span></header><main class="${workspace?'workspace-main':''}">${page==='form'?'':displaySettingsHTML()}${content}${page==='form'?displaySettingsHTML():''}</main><nav class="bottom-nav" aria-label="主导航">${(['form','chart','gua','history'] as Page[]).map(p=>`<button data-page="${p}" class="${page===p?'active':''}" ${page===p?'aria-current="page"':''}><span>${icon(p)}</span>${{form:'起盘',chart:'命盘',gua:'命卦',history:'档案'}[p]}</button>`).join('')}</nav>`;
   for(const field of dailyDraft){const el=root.querySelector<HTMLInputElement|HTMLSelectElement>(`#daily-form [name="${field.name}"]`);if(el){el.value=field.value;if(el instanceof HTMLInputElement)el.checked=field.checked;}}
