@@ -17,6 +17,7 @@ app.whenReady().then(async () => {
   assert.equal(await win.webContents.executeJavaScript(`new Promise(resolve => navigator.geolocation.getCurrentPosition(() => resolve(0), error => resolve(error.code)))`), 1);
   assert.equal(await win.webContents.executeJavaScript(`typeof require`), 'undefined');
   assert.equal(await win.webContents.executeJavaScript(`document.querySelector('#app').children.length > 0`), true);
+  assert.equal(await win.webContents.executeJavaScript(`document.documentElement.classList.contains('wide-layout')`), true);
   await win.webContents.executeJavaScript(`localStorage.setItem('desktop-smoke', 'retained')`);
   win.destroy();
   win = await createWindow(false);

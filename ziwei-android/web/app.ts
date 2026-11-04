@@ -35,6 +35,12 @@ window.addEventListener('systemthemechange',e=>{const dark=(e as CustomEvent<boo
 window.addEventListener('pageshow',systemColorChanged);
 applyTheme();
 
+const wideScreen=window.matchMedia('(min-width:900px) and (min-device-height:600px) and (orientation:landscape)');
+const updateWorkspaceLayout=()=>document.documentElement.classList.toggle('wide-layout',(location.protocol==='app:'&&location.host==='tianji')||wideScreen.matches);
+updateWorkspaceLayout();
+if(wideScreen.addEventListener)wideScreen.addEventListener('change',updateWorkspaceLayout);
+else wideScreen.addListener(updateWorkspaceLayout);
+
 type Page = 'form' | 'chart' | 'gua' | 'history';
 const root = document.querySelector<HTMLDivElement>('#app')!;
 const storageKey = 'tianji-charts-v1';

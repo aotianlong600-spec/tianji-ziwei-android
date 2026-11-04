@@ -63,7 +63,7 @@ jobs:
           codesign --verify --deep --strict --verbose=2 "$bundle"
           file "$bundle/Contents/MacOS/天纪紫微"
           if [ "$EXPECTED_ARCH" = x64 ]; then native_arch=x86_64; else native_arch=arm64; fi
-          lipo -verify_arch "$native_arch" "$bundle/Contents/MacOS/天纪紫微"
+          lipo "$bundle/Contents/MacOS/天纪紫微" -verify_arch "$native_arch"
       - name: Upload desktop package
         uses: actions/upload-artifact@v7.0.2
         with:
