@@ -20,9 +20,11 @@ jobs:
           - os: macos-15-intel
             platform: mac
             arch: x64
-          - os: macos-15
+          # shortcut: cross-build ARM64 on Intel while hosted ARM runners are unavailable; restore native ARM smoke when the pool recovers.
+          - os: macos-15-intel
             platform: mac
             arch: arm64
+            hostArch: x64
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     env:
@@ -39,11 +41,11 @@ jobs:
           cache-dependency-path: |
             ziwei-doushu/package-lock.json
             desktop/package-lock.json
-      - name: Check version and native architecture
+      - name: Check version and build host architecture
         env:
-          EXPECTED_ARCH: ${{ matrix.arch }}
+          EXPECTED_HOST_ARCH: ${{ matrix.hostArch || matrix.arch }}
         run: |
-          node -e "const a=require('node:assert/strict'),v=require('./desktop/package.json').version;a.equal(process.arch,process.env.EXPECTED_ARCH);a.equal(v,require('./ziwei-doushu/package.json').version);if(process.env.GITHUB_REF_TYPE==='tag')a.equal(process.env.GITHUB_REF_NAME,'v'+v)"
+          node -e "const a=require('node:assert/strict'),v=require('./desktop/package.json').version;a.equal(process.arch,process.env.EXPECTED_HOST_ARCH);a.equal(v,require('./ziwei-doushu/package.json').version);if(process.env.GITHUB_REF_TYPE==='tag')a.equal(process.env.GITHUB_REF_NAME,'v'+v)"
       - run: npm ci --prefix ziwei-doushu --no-audit --no-fund
       - run: npm ci --prefix desktop --no-audit --no-fund
       - name: Test desktop security boundary and offline renderer

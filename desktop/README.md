@@ -18,7 +18,7 @@ Windows：`npm run dist:win --prefix desktop`，生成 `desktop/build/dist/tianj
 
 macOS：在对应机器运行 `npm run dist:mac --prefix desktop -- --x64`（Intel）或 `--arm64`（Apple Silicon），生成相应 `tianji-ziwei-1.9.0-mac-*.zip`，解压后将“天纪紫微.app”移入“应用程序”。
 
-GitHub Actions 工作流 `Desktop release` 分别使用 Windows、Intel Mac 和 Apple Silicon Mac 构建，执行隐藏窗口的离线渲染、安全设置及存储自检，并验证 Mac 包签名与架构。手动运行 main 仅上传工作流产物；版本标签运行在所有构建成功后向**已存在**的相应 Release 附加文件，不会创建 Release。
+GitHub Actions 工作流 `Desktop release` 使用 Windows 与 Intel Mac 构建，执行当前构建主机上的隐藏窗口离线渲染、安全设置及存储自检，并验证 Mac 包签名与目标架构。Apple Silicon 构建机分配持续延迟时，ARM64 由 Intel Mac 交叉打包，仍检查 ARM64 二进制及严格签名；本次不宣称 ARM64 成品已在 Apple 芯片启动。手动运行 main 仅上传工作流产物；版本标签运行在所有构建成功后向**已存在**的相应 Release 附加文件，不会创建 Release。
 
 ## 数据与分发限制
 
