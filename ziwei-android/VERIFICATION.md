@@ -14,6 +14,8 @@
 - 同一出生瞬间使用当地／北京时间记录，按出生地时区选择日期线分支，太阳日期、四柱和命盘保持一致；Apia与纽约有回归断言。Chromium实际表单验证Apia2020-01-02当地12:00与北京时间06:00都得到真太阳时约10:29:24；没有把记录时制误标为出生地时区。
 - 浏览器实际验证国内空IANA的标准北京时间起盘、全球国家／城市联动、纽约回拨两次结果、跳时提示、海外档案重开保留时区和选择，以及断网排盘。320像素表单和1024×768双栏无横向溢出；隐藏生辰后页面不包含New York或America/New_York。
 - Apple Silicon托管构建机持续排队，1.9.0的ARM64桌面包改为Intel Mac交叉打包；执行主机x64运行自检及目标ARM64架构、严格签名检查，不把这些检查当成ARM64成品启动验证。
+- 网页已由[41875805863](https://github.com/aotianlong600-spec/tianji-ziwei-android/actions/runs/41875805863)发布，线上排盘脚本与本地验证的字节一致。桌面[版本标签构建41880009345](https://github.com/aotianlong600-spec/tianji-ziwei-android/actions/runs/41880009345)通过并附加三种成品；较早的原生ARM构建[41875936145](https://github.com/aotianlong600-spec/tianji-ziwei-android/actions/runs/41875936145)也完成了相同应用代码的运行自检。
+- [1.9.0发布页](https://github.com/aotianlong600-spec/tianji-ziwei-android/releases/tag/v1.9.0)现含APK、Windows、Intel Mac、ARM64 Mac。实际下载后逐个比对GitHub摘要；从两份Mac ZIP与Windows内嵌7z读取app.asar，确认排盘脚本、样式、页面、主进程及权限策略与已核验源码一致，包含地区数据署名。两份Mac最低系统为13.0，CPU分别x64／ARM64；Windows内嵌主程序为AMD64，外层NSIS引导器为32位。
 
 ## iPhone / iPad 网页 App
 
